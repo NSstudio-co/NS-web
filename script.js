@@ -166,6 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initBlurReveals();
     initSpotlightEffect();
     initNavbar();
+    initMobileMenu();
     initTimeline();
     initCurvedLoop();
     initCursor();
@@ -174,6 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initContactForm();
     initScrollProgress();
     initMagneticButtons();
+    initParticles();
 });
 
 /* ==========================================================================
@@ -269,6 +271,32 @@ function initNavbar() {
         } else {
             navbar.classList.remove('scrolled');
         }
+    });
+}
+
+/* ==========================================================================
+   Mobile Menu Toggle
+   ========================================================================== */
+function initMobileMenu() {
+    const btn = document.querySelector('.mobile-menu-btn');
+    const navLinks = document.querySelector('.nav-links');
+    if (!btn || !navLinks) return;
+
+    btn.addEventListener('click', () => {
+        const isOpen = navLinks.classList.toggle('mobile-open');
+        btn.innerHTML = isOpen
+            ? '<i data-lucide="x"></i>'
+            : '<i data-lucide="menu"></i>';
+        if (window.lucide) lucide.createIcons();
+    });
+
+    // Close menu when a nav link is clicked
+    navLinks.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+            navLinks.classList.remove('mobile-open');
+            btn.innerHTML = '<i data-lucide="menu"></i>';
+            if (window.lucide) lucide.createIcons();
+        });
     });
 }
 
@@ -636,4 +664,99 @@ function initCookieBanner() {
         localStorage.setItem('cookiesAccepted', 'true');
         banner.classList.remove('show');
     });
+}
+
+/* ==========================================================================
+   Particle Background
+   ========================================================================== */
+function initParticles() {
+    const canvas = document.getElementById('particles-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    let mouseX = -9999, mouseY = -9999;
+    let width, height;
+
+    const resize = () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    const COUNT = 120;
+    const CONNECT_DIST = 130;
+    const REPEL_RADIUS = 150;
+    const REPEL_STRENGTH = 0.8;
+    const FRICTION = 0.96;
+    const BASE_SPEED = 0.35;
+
+    const particles = Array.from({ length: COUNT }, () => ({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        vx: (Math.random() - 0.5) * BASE_SPEED,
+        vy: (Math.random() - 0.5) * BASE_SPEED,
+        size: Math.random() * 1.8 + 0.8,
+        opacity: Math.random() * 0.4 + 0.2,
+    }));
+
+    const animate = () => {
+        ctx.clearRect(0, 0, width, height);
+
+        for (const p of particles) {
+            // Cursor repulsion
+            const dx = p.x - mouseX;
+            const dy = p.y - mouseY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < REPEL_RADIUS && dist > 0) {
+                const force = ((REPEL_RADIUS - dist) / REPEL_RADIUS) * REPEL_STRENGTH;
+                p.vx += (dx / dist) * force;
+                p.vy += (dy / dist) * force;
+            }
+
+            p.vx *= FRICTION;
+            p.vy *= FRICTION;
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Wrap edges
+            if (p.x < 0) p.x = width;
+            else if (p.x > width) p.x = 0;
+            if (p.y < 0) p.y = height;
+            else if (p.y > height) p.y = 0;
+
+            // Draw dot
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+            ctx.fill();
+        }
+
+        // Draw connecting lines between close particles
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < CONNECT_DIST) {
+                    const alpha = (1 - dist / CONNECT_DIST) * 0.15;
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        requestAnimationFrame(animate);
+    };
+
+    animate();
 }

@@ -6,7 +6,7 @@
     /* Strictly Monochrome Palette */
     --bg-dark: #0a0a0c;
     /* Deep charcoal background */
-    --bg-card: rgba(255, 255, 255, 0.02);
+    --bg-card: #0e0e11;
     --card-border: rgba(255, 255, 255, 0.08);
     /* 1px subtle border */
 
@@ -47,7 +47,6 @@ html {
 
 body.clean-theme {
     font-family: var(--font-body);
-    background-color: var(--bg-dark);
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
@@ -171,6 +170,18 @@ ul {
 }
 
 /* ==========================================================================
+   Particle Canvas
+   ========================================================================== */
+#particles-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* ==========================================================================
    Subtle Ethereal Dot Grid
    ========================================================================== */
 .background-grid {
@@ -248,6 +259,52 @@ ul {
     display: none;
     cursor: pointer;
     color: var(--text-muted);
+    background: none;
+    border: none;
+    padding: 0.25rem;
+}
+
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: flex;
+        align-items: center;
+    }
+
+    .nav-links {
+        display: none;
+        position: absolute;
+        top: var(--nav-height);
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        gap: 0;
+        background: rgba(10, 10, 12, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--card-border);
+        padding: 1rem 5%;
+    }
+
+    .nav-links.mobile-open {
+        display: flex;
+    }
+
+    .nav-links li {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--card-border);
+    }
+
+    .nav-links li:last-child {
+        border-bottom: none;
+    }
+
+    .nav-links a {
+        font-size: 1rem;
+    }
+
+    .lang-switcher {
+        margin-left: 0;
+    }
 }
 
 /* ==========================================================================
@@ -1138,7 +1195,7 @@ ul {
 
 .form-group input,
 .form-group textarea {
-    background: rgba(255, 255, 255, 0.03);
+    background: #111114;
     border: 1px solid var(--card-border);
     border-radius: 8px;
     padding: 0.75rem 1rem;
@@ -1313,14 +1370,6 @@ ul {
    Responsive
    ========================================================================== */
 @media (max-width: 768px) {
-    .nav-links {
-        display: none;
-    }
-
-    .mobile-menu-btn {
-        display: block;
-    }
-
     .spotlight-grid,
     .portfolio-grid {
         grid-template-columns: 1fr;
