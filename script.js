@@ -64,8 +64,7 @@ const translations = {
         faq3_a: "E-shopy řešíme po domluvě. Kontaktuj nás a popište rozsah projektu — rádi se domluvíme.",
         faq4_q: "Co potřebuji mít připravené?",
         faq4_a: "Stačí mít představu o tom, co chcete sdělit, a ideálně logo nebo brand guide. Vše ostatní vyřešíme společně.",
-        faq5_q: "Kolik stojí doručení takového webu?",
-        faq5_a: "Cena se odvíjí od rozsahu a funkcí. Základní weby s kódem na míru začínají okolo 15 000 Kč. Přesný odhad připravíme po úvodním hovoru.",
+
         faq6_q: "Můžu si web po spuštění sám měnit?",
         faq6_a: "Záleží na vybraném řešení. Preferujeme výkonné weby, o které se staráme plně my, ale umíme nasadit i spolehlivé CMS (např. Sanity), pokud je správa obsahu pro vás prioritní.",
         faq7_q: "Jak je to s údržbou?",
@@ -140,8 +139,7 @@ const translations = {
         faq3_a: "E-commerce projects are handled by arrangement. Contact us and describe your project scope — we'll be happy to discuss what makes sense for your business.",
         faq4_q: "What do I need to have ready?",
         faq4_a: "Just an idea of what you want to say, and ideally a logo or brand guide. Everything else — copy, photos, structure — we sort out together on the discovery call.",
-        faq5_q: "How much does a custom site cost?",
-        faq5_a: "Price depends on the scope. Custom coded sites start around 15,000 CZK. We provide a precise estimate after the discovery call.",
+
         faq6_q: "Can I edit the site myself?",
         faq6_a: "It depends on the solution. We prefer performant bespoke sites maintained fully by us, but we can deploy a reliable CMS (e.g. Sanity) if content management is a priority.",
         faq7_q: "What about maintenance?",
@@ -689,20 +687,20 @@ function initParticles() {
         mouseY = e.clientY;
     });
 
-    const COUNT = 120;
-    const CONNECT_DIST = 130;
-    const REPEL_RADIUS = 150;
-    const REPEL_STRENGTH = 0.8;
+    const COUNT = 90;
+    const CONNECT_DIST = 120;
+    const REPEL_RADIUS = 140;
+    const REPEL_STRENGTH = 0.7;
     const FRICTION = 0.96;
-    const BASE_SPEED = 0.35;
+    const BASE_SPEED = 0.3;
 
     const particles = Array.from({ length: COUNT }, () => ({
         x: Math.random() * window.innerWidth,
         y: Math.random() * window.innerHeight,
         vx: (Math.random() - 0.5) * BASE_SPEED,
         vy: (Math.random() - 0.5) * BASE_SPEED,
-        size: Math.random() * 1.8 + 0.8,
-        opacity: Math.random() * 0.4 + 0.2,
+        size: Math.random() * 2 + 1.2,
+        opacity: Math.random() * 0.7 + 0.15,
     }));
 
     const animate = () => {
@@ -744,7 +742,7 @@ function initParticles() {
                 const dy = particles[i].y - particles[j].y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < CONNECT_DIST) {
-                    const alpha = (1 - dist / CONNECT_DIST) * 0.15;
+                    const alpha = (1 - dist / CONNECT_DIST) * 0.12;
                     ctx.beginPath();
                     ctx.moveTo(particles[i].x, particles[i].y);
                     ctx.lineTo(particles[j].x, particles[j].y);
