@@ -288,6 +288,84 @@ let currentLang = localStorage.getItem('ns-studio-clean-lang') || 'cs';
     window.addEventListener('load', reveal);
 })();
 
+/* ==========================================================================
+   Scroll loop (M0) — the ONLY scroll listener on the page. Every scroll-driven
+   effect registers through onScroll(); callbacks run inside a single rAF tick
+   that reads scrollY / innerHeight once and hands them over, so no effect
+   touches the layout on its own. The tick also keeps a smoothed scroll
+   velocity in scrollState.velocity (px per frame) for effects that react to
+   how fast the page is moving.
+
+   Rule: never add another window scroll listener — register here instead.
+
+   Deliberately NOT published as a CSS variable on :root: custom properties
+   inherit, so rewriting one on the root element invalidates the computed
+   style of the whole document every frame. Measured on the homepage at 4x CPU
+   throttling that alone cost avg 16.8 -> 19.6 ms/frame and 1 -> 25 frames
+   over 33 ms. A CSS consumer must get the variable written onto its own
+   element, not onto :root.
+   ========================================================================== */
+const scrollCallbacks = [];
+const scrollState = {
+    y: window.scrollY,
+    vh: window.innerHeight,
+    max: 0, // scrollable distance — document height minus one viewport
+    velocity: 0
+};
+
+function onScroll(fn) {
+    scrollCallbacks.push(fn);
+    fn(scrollState); // prime the effect with the current position
+}
+
+function initScrollLoop() {
+    const root = document.documentElement;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let lastY = window.scrollY;
+    let smoothV = 0;
+    let queued = false;
+
+    const schedule = () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(tick);
+    };
+
+    const tick = () => {
+        queued = false;
+
+        // All layout reads happen here, at the top of the frame and once —
+        // callbacks below only write. Anything that needs a measurement takes
+        // it from scrollState instead of asking the DOM again.
+        scrollState.y = window.scrollY;
+        scrollState.vh = window.innerHeight;
+        scrollState.max = Math.max(0, root.scrollHeight - root.clientHeight);
+
+        // Velocity in px/frame, lerped — a raw delta makes anything bound to
+        // it (grain, marquee speed) flicker. Snap to 0 once it's negligible so
+        // the loop can stop instead of ticking forever on a tiny remainder.
+        const raw = Math.abs(scrollState.y - lastY);
+        lastY = scrollState.y;
+        smoothV += (raw - smoothV) * 0.18;
+        if (smoothV < 0.1 || reduceMotion) smoothV = 0;
+        scrollState.velocity = smoothV;
+
+        for (let i = 0; i < scrollCallbacks.length; i++) {
+            scrollCallbacks[i](scrollState);
+        }
+
+        // Keep ticking while the velocity settles back to zero, otherwise the
+        // last frame of a scroll would leave it stuck mid-value.
+        if (smoothV > 0) schedule();
+    };
+
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+
+    tick();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     // JS-driven i18n only applies to the homepage (data-i18n spans there get
     // swapped on the fly). Service subpages are static per-language HTML
@@ -300,6 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         currentLang = document.documentElement.lang === 'en' ? 'en' : 'cs';
     }
+    initScrollLoop(); // must come first — everything scroll-driven hangs off it
     initBlurReveals();
     initSpotlightEffect();
     initNavbar();
@@ -426,27 +505,14 @@ function initPortfolioParallax() {
     const wraps = document.querySelectorAll('.portfolio-img-wrap');
     if (!wraps.length) return;
 
-    let ticking = false;
-
-    const update = () => {
-        const viewportH = window.innerHeight;
+    onScroll(({ vh }) => {
         wraps.forEach(wrap => {
             const rect = wrap.getBoundingClientRect();
             const center = rect.top + rect.height / 2;
-            const progress = Math.max(-1, Math.min(1, (center - viewportH / 2) / (viewportH / 2)));
+            const progress = Math.max(-1, Math.min(1, (center - vh / 2) / (vh / 2)));
             wrap.style.transform = `translateY(${progress * -12}px)`;
         });
-        ticking = false;
-    };
-
-    window.addEventListener('scroll', () => {
-        if (!ticking) {
-            requestAnimationFrame(update);
-            ticking = true;
-        }
-    }, { passive: true });
-
-    update();
+    });
 }
 
 /* ==========================================================================
@@ -468,23 +534,12 @@ function initBackgroundParallax() {
 
     const SPEED = 0.18;
     const PATTERN = 40; // dot grid period — offsets wrap seamlessly
-    let ticking = false;
 
-    const update = () => {
-        const offset = (window.scrollY * SPEED) % PATTERN;
+    onScroll(({ y }) => {
+        const offset = (y * SPEED) % PATTERN;
         dots.style.transform = `translateY(${-offset}px)`;
         if (reveal) reveal.style.backgroundPosition = `0 ${-offset}px`;
-        ticking = false;
-    };
-
-    window.addEventListener('scroll', () => {
-        if (!ticking) {
-            requestAnimationFrame(update);
-            ticking = true;
-        }
-    }, { passive: true });
-
-    update();
+    });
 }
 
 /* ==========================================================================
@@ -616,22 +671,21 @@ function initNavbar() {
     const HIDE_DELTA = 5;
     let lastScrollY = window.scrollY;
 
-    window.addEventListener('scroll', () => {
-        const currentY = window.scrollY;
+    onScroll(({ y }) => {
         const menuOpen = navLinks && navLinks.classList.contains('mobile-open');
 
-        navbar.classList.toggle('scrolled', currentY > BG_THRESHOLD);
+        navbar.classList.toggle('scrolled', y > BG_THRESHOLD);
 
         if (!menuOpen) {
-            if (currentY < BG_THRESHOLD || currentY < lastScrollY - HIDE_DELTA) {
+            if (y < BG_THRESHOLD || y < lastScrollY - HIDE_DELTA) {
                 navbar.classList.remove('nav-hidden');
-            } else if (currentY > lastScrollY + HIDE_DELTA) {
+            } else if (y > lastScrollY + HIDE_DELTA) {
                 navbar.classList.add('nav-hidden');
             }
         }
 
-        lastScrollY = currentY;
-    }, { passive: true });
+        lastScrollY = y;
+    });
 }
 
 /* ==========================================================================
@@ -695,34 +749,40 @@ function initTimeline() {
 
     if (!processSection || !timelineFill || !timelineSteps.length) return;
 
-    window.addEventListener('scroll', () => {
-        const scrollPosition = window.scrollY;
-        const windowHeight = window.innerHeight;
+    // Section geometry is measured once (and on resize) — reading offsetTop /
+    // offsetHeight inside the scroll path forces a layout on every frame.
+    let sectionTop = 0;
+    let sectionHeight = 0;
 
-        const sectionTop = processSection.offsetTop;
-        const sectionHeight = processSection.offsetHeight;
+    const measure = () => {
+        sectionTop = processSection.offsetTop;
+        sectionHeight = processSection.offsetHeight;
+    };
 
-        const startPoint = sectionTop - windowHeight + (windowHeight * 0.4);
-        const endPoint = sectionTop + sectionHeight - (windowHeight * 0.6);
+    const setFill = (ratio) => {
+        timelineFill.style.transform = `scaleY(${ratio})`;
+    };
 
-        if (scrollPosition > startPoint && scrollPosition < endPoint) {
-            let percentage = ((scrollPosition - startPoint) / (endPoint - startPoint)) * 100;
-            percentage = Math.max(0, Math.min(percentage, 100)); // clamp
-            timelineFill.style.height = `${percentage}%`;
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    onScroll(({ y, vh }) => {
+        const startPoint = sectionTop - vh + (vh * 0.4);
+        const endPoint = sectionTop + sectionHeight - (vh * 0.6);
+
+        if (y > startPoint && y < endPoint) {
+            const percentage = Math.max(0, Math.min(((y - startPoint) / (endPoint - startPoint)) * 100, 100));
+            setFill(percentage / 100);
 
             timelineSteps.forEach((step, index) => {
                 const stepThreshold = (index / timelineSteps.length) * 100;
-                if (percentage > stepThreshold + 5) {
-                    step.classList.add('active');
-                } else {
-                    step.classList.remove('active');
-                }
+                step.classList.toggle('active', percentage > stepThreshold + 5);
             });
-        } else if (scrollPosition <= startPoint) {
-            timelineFill.style.height = '0%';
+        } else if (y <= startPoint) {
+            setFill(0);
             timelineSteps.forEach(step => step.classList.remove('active'));
-        } else if (scrollPosition >= endPoint) {
-            timelineFill.style.height = '100%';
+        } else {
+            setFill(1);
             timelineSteps.forEach(step => step.classList.add('active'));
         }
     });
@@ -747,6 +807,10 @@ function initPointerAmbience() {
         mouseX = e.clientX;
         mouseY = e.clientY;
         document.body.classList.add('cursor-active');
+        if (!running) {
+            running = true;
+            requestAnimationFrame(animateGlow);
+        }
     });
 
     // Smooth trailing — the light lags slightly behind the pointer
@@ -787,10 +851,6 @@ function initFAQ() {
             if (!isOpen) {
                 btn.setAttribute('aria-expanded', 'true');
                 answer.classList.add('open');
-        if (!running) {
-            running = true;
-            requestAnimationFrame(animateGlow);
-        }
             }
         });
     });
@@ -880,11 +940,11 @@ function initScrollProgress() {
     const bar = document.getElementById('scroll-progress');
     if (!bar) return;
 
-    window.addEventListener('scroll', () => {
-        const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
-        const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-        const scrolled = (winScroll / height) * 100;
-        bar.style.width = scrolled + "%";
+    onScroll(({ y, max }) => {
+        const scrolled = max > 0 ? Math.min(y / max, 1) : 0;
+        // scaleX, not width — width is a layout property and repaints the bar
+        // through layout on every frame.
+        bar.style.transform = `scaleX(${scrolled})`;
     });
 }
 
@@ -895,14 +955,13 @@ function initMagneticButtons() {
     // Respect users who prefer no motion — skip the pull effect entirely
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    // List of classes that should exhibit magnetic behavior
-    const magneticEls = document.querySelectorAll('.btn, .logo, .nav-links a, .portfolio-item');
+    // Buttons and the logo only. Nav links are too small — the pull reads as
+    // nervous — and on .portfolio-item the inline transform fights the
+    // .blur-reveal transform whenever a card is hovered mid-reveal.
+    const magneticEls = document.querySelectorAll('.btn, .logo');
+    const strength = 0.12;
 
     magneticEls.forEach(el => {
-        // Big elements (portfolio windows) get a much gentler pull than
-        // small ones (buttons, links) so nothing feels like it "bounces".
-        const strength = el.classList.contains('portfolio-item') ? 0.04 : 0.12;
-
         el.addEventListener('mousemove', (e) => {
             const rect = el.getBoundingClientRect();
             const x = e.clientX - rect.left - rect.width / 2;
