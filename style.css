@@ -111,7 +111,6 @@ body.clean-theme {
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    cursor: none;
 }
 
 /* A8: page entrance — masks FOUT while the self-hosted fonts settle. Gated
@@ -144,70 +143,10 @@ body.clean-theme::after {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ==========================================================================
-   Custom Cursor — Minimal Dot
-   ========================================================================== */
-.cursor-dot {
-    width: 9px;
-    height: 9px;
-    background: var(--text-primary);
-    border: 0 solid rgba(242, 239, 233, 0.9);
-    border-radius: 50%;
-    position: fixed;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-    z-index: 9999;
-    transform: translate(-50%, -50%);
-    mix-blend-mode: difference;
-    box-shadow: 0 0 12px 2px rgba(242, 239, 233, 0.6);
-    transition: width 0.25s var(--ease-smooth), height 0.25s var(--ease-smooth), background 0.25s var(--ease-smooth), border-width 0.25s var(--ease-smooth), box-shadow 0.25s var(--ease-smooth);
-}
-
-/* Hover over interactive elements (buttons, links, cards…) — opens into a ring */
-.cursor-dot.hovering {
-    width: 42px;
-    height: 42px;
-    background: rgba(242, 239, 233, 0.06);
-    border-width: 1.5px;
-    box-shadow: 0 0 26px 4px rgba(242, 239, 233, 0.16);
-}
-
-/* Restore cursor for inputs */
-input,
-textarea,
-select {
-    cursor: text;
-}
-
-a,
-button {
-    cursor: none;
-}
-
-/* Bulletproof: hide the native cursor on everything (the custom dot takes
-   over). The universal !important defeats UA/element quirks that otherwise
-   re-show the system arrow on some buttons in Brave/Chromium. Text fields
-   keep their caret. */
-.clean-theme *:not(input):not(textarea):not(select) {
-    cursor: none !important;
-}
-
-/* Touch / mobile devices: no custom cursor at all — restore native behaviour
-   and hide the dot regardless of JS. Covers phones, tablets and stylus. */
+/* Touch / mobile devices: the pointer-following glow has nothing to follow. */
 @media (hover: none), (pointer: coarse) {
-    body.clean-theme,
-    .clean-theme *:not(input):not(textarea):not(select),
-    a,
-    button,
-    .btn,
-    .lang-btn,
-    .mobile-menu-btn {
-        cursor: auto !important;
-    }
-
-    .cursor-dot,
-    .cursor-glow {
+    .cursor-glow,
+    .grid-reveal {
         display: none !important;
     }
 }
@@ -275,8 +214,7 @@ ul {
     color: var(--bg-dark);
 }
 
-/* Keyboard focus — invisible custom cursor means this is the only way
-   keyboard users can see where they are. */
+/* Keyboard focus — the only way keyboard users can see where they are. */
 :focus-visible {
     outline: 2px solid var(--text-primary);
     outline-offset: 3px;
@@ -466,7 +404,7 @@ ul {
 
 .mobile-menu-btn {
     display: none;
-    cursor: none;
+    cursor: pointer;
     color: var(--text-muted);
     background: none;
     border: none;
@@ -531,7 +469,7 @@ ul {
 .lang-btn {
     background: none;
     border: none;
-    cursor: none;
+    cursor: pointer;
     color: var(--text-faint);
     transition: color 0.3s;
     font-family: inherit;
@@ -559,7 +497,7 @@ ul {
     font-size: 0.9rem;
     font-weight: 500;
     border-radius: 2px;
-    cursor: none;
+    cursor: pointer;
     transition: all 0.3s var(--ease-smooth);
 }
 
@@ -1558,6 +1496,7 @@ ul {
     font-weight: 500;
     text-align: left;
     gap: 1rem;
+    cursor: pointer;
     transition: color 0.2s;
 }
 

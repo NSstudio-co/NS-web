@@ -305,7 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initNavbar();
     initMobileMenu();
     initTimeline();
-    initCursor();
+    initPointerAmbience();
     initFAQ();
     initContactForm();
     initPricingCards();
@@ -729,24 +729,18 @@ function initTimeline() {
 }
 
 /* ==========================================================================
-   Custom Cursor
+   Pointer ambience — the native cursor is back; this only feeds the soft
+   glow + lit dot grid that trail the pointer across the background.
    ========================================================================== */
-function initCursor() {
-    const dot = document.getElementById('cursor-dot');
-    if (!dot) return;
-
-    // Disable ONLY on touch-only devices (no mouse/trackpad).
+function initPointerAmbience() {
+    // Touch-only devices have no pointer to follow (CSS hides the layers too).
     // Note: 'ontouchstart'/maxTouchPoints give false positives on laptops
     // (esp. Chromium/Brave on macOS), so use a pointer media query instead.
-    const isTouchOnly = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-    if (isTouchOnly) {
-        dot.style.display = 'none';
-        document.body.style.cursor = 'auto';
-        return;
-    }
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
 
     let mouseX = 0, mouseY = 0;
-    let dotX = 0, dotY = 0;
+    let glowX = 0, glowY = 0;
+    let running = false;
     const root = document.documentElement;
 
     document.addEventListener('mousemove', (e) => {
@@ -755,39 +749,19 @@ function initCursor() {
         document.body.classList.add('cursor-active');
     });
 
-    // Smooth trailing for the dot
-    const animateDot = () => {
-        dotX += (mouseX - dotX) * 0.2;
-        dotY += (mouseY - dotY) * 0.2;
-        dot.style.left = dotX + 'px';
-        dot.style.top = dotY + 'px';
-        root.style.setProperty('--mx', dotX + 'px');
-        root.style.setProperty('--my', dotY + 'px');
-        requestAnimationFrame(animateDot);
-    };
-    animateDot();
-
-    // --- Hover states ---
-    const setCursorHover = () => {
-        dot.classList.add('hovering');
+    // Smooth trailing — the light lags slightly behind the pointer
+    const animateGlow = () => {
+        glowX += (mouseX - glowX) * 0.2;
+        glowY += (mouseY - glowY) * 0.2;
+        root.style.setProperty('--mx', glowX + 'px');
+        root.style.setProperty('--my', glowY + 'px');
+        requestAnimationFrame(animateGlow);
     };
 
-    const clearCursorHover = () => {
-        dot.classList.remove('hovering');
-    };
-
-    document.querySelectorAll('a, button, input, textarea, .faq-question, .portfolio-item, .contact-box, .spotlight-card').forEach(el => {
-        el.addEventListener('mouseenter', setCursorHover);
-        el.addEventListener('mouseleave', clearCursorHover);
-    });
-
-    // Hide cursor when leaving window
     document.addEventListener('mouseleave', () => {
-        dot.style.opacity = '0';
         document.body.classList.remove('cursor-active');
     });
     document.addEventListener('mouseenter', () => {
-        dot.style.opacity = '1';
         document.body.classList.add('cursor-active');
     });
 }
@@ -813,6 +787,10 @@ function initFAQ() {
             if (!isOpen) {
                 btn.setAttribute('aria-expanded', 'true');
                 answer.classList.add('open');
+        if (!running) {
+            running = true;
+            requestAnimationFrame(animateGlow);
+        }
             }
         });
     });
