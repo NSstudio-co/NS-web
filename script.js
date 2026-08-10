@@ -379,6 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentLang = document.documentElement.lang === 'en' ? 'en' : 'cs';
     }
     initScrollLoop(); // must come first — everything scroll-driven hangs off it
+    initLineReveals(); // before initBlurReveals — it moves .blur-reveal around
     initBlurReveals();
     initSpotlightEffect();
     initNavbar();
@@ -407,13 +408,17 @@ function updateLanguage(lang) {
 
     document.documentElement.lang = lang;
 
+    restoreLineReveals(); // un-split first, so [data-i18n] spans are intact
+
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (translations[lang][key]) {
-            // Check if el has innerHTML we want to keep structure for, usually just text 
+            // Check if el has innerHTML we want to keep structure for, usually just text
             el.innerHTML = translations[lang][key];
         }
     });
+
+    resplitLineReveals(); // the new text wraps differently — measure again
 
     document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
@@ -493,6 +498,156 @@ function initBlurReveals() {
     }, observerOptions);
 
     revealElements.forEach(el => observer.observe(el));
+}
+
+/* ==========================================================================
+   M3 — line mask reveal. Section headings and subtitles are split into their
+   visual lines; each line slides up from behind its own mask, the same move
+   the hero headline makes. Replaces the generic blur on those elements —
+   blur stays where it still works (cards, images, grids).
+   ========================================================================== */
+const LINE_REVEAL_SELECTOR = '.section-title, .section-subtitle';
+const lineReveals = []; // { el, html } — html is the un-split markup, for i18n
+
+function initLineReveals() {
+    const targets = Array.from(document.querySelectorAll(LINE_REVEAL_SELECTOR));
+    if (!targets.length) return;
+
+    // The whole .section-header used to blur in as one block, which would
+    // muddy the line slide happening inside it. Move the blur onto the small
+    // eyebrow and let the heading carry the section's entrance instead.
+    // Runs before initBlurReveals() so the observer picks up the new element.
+    targets.forEach(el => {
+        const header = el.closest('.section-header');
+        if (!header || !header.classList.contains('blur-reveal')) return;
+        header.classList.remove('blur-reveal');
+        const eyebrow = header.querySelector('.section-eyebrow');
+        if (eyebrow) eyebrow.classList.add('blur-reveal');
+    });
+
+    // Reduced motion: no splitting at all, the text just stays as authored.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const observer = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('active');
+            obs.unobserve(entry.target);
+        });
+    }, { threshold: 0.2 });
+
+    const run = () => {
+        targets.forEach(el => {
+            const html = el.innerHTML;
+            if (!splitIntoLines(el)) return;
+            lineReveals.push({ el, html });
+            observer.observe(el);
+        });
+    };
+
+    // Lines can only be measured once the real fonts are in — measuring
+    // against the fallback breaks at different widths. Same belt-and-braces
+    // pair of triggers the page entrance uses.
+    let done = false;
+    const runOnce = () => { if (!done) { done = true; run(); } };
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(runOnce);
+        setTimeout(runOnce, 800);
+    } else {
+        runOnce();
+    }
+}
+
+/* Wraps every visual line of `el` in <span class="line"><span class="line-inner">.
+   Works off Ranges rather than string splitting, so inline markup inside the
+   heading (the <em> accents, the [data-i18n] spans) survives intact — even
+   when a line break falls in the middle of one. */
+function splitIntoLines(el) {
+    const doc = el.ownerDocument;
+    const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const words = [];
+
+    let node;
+    while ((node = walker.nextNode())) {
+        const re = /\S+/g;
+        let m;
+        while ((m = re.exec(node.nodeValue))) {
+            words.push({ node, start: m.index, end: m.index + m[0].length });
+        }
+    }
+    if (!words.length) return false;
+
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 0;
+    const range = doc.createRange();
+    const lines = [];
+    let current = null;
+    let lineTop = 0;
+
+    words.forEach(word => {
+        range.setStart(word.node, word.start);
+        range.setEnd(word.node, word.end);
+        const rect = range.getBoundingClientRect();
+        if (!rect.height) return; // not rendered (hidden branch) — ignore
+
+        // A word starts a new line once it sits more than half a line below
+        // the first word of the current one. The tolerance keeps italic serif
+        // <em> accents, whose metrics differ from the sans, on their own line.
+        const step = Math.min(rect.height, lineHeight || rect.height) * 0.5;
+        if (!current || rect.top - lineTop > step) {
+            current = { first: word, last: word };
+            lines.push(current);
+            lineTop = rect.top;
+        } else {
+            current.last = word;
+        }
+    });
+    if (!lines.length) return false;
+
+    // Clone every line before touching the DOM — the ranges point into the
+    // nodes we are about to replace.
+    const base = el.classList.contains('section-subtitle') ? 120 : 0;
+    const frag = doc.createDocumentFragment();
+
+    lines.forEach((line, i) => {
+        range.setStart(line.first.node, line.first.start);
+        range.setEnd(line.last.node, line.last.end);
+
+        const inner = doc.createElement('span');
+        inner.className = 'line-inner';
+        inner.style.transitionDelay = `${base + i * 70}ms`;
+        inner.appendChild(range.cloneContents());
+        // The clone stops at the last word, dropping the space that separated
+        // the lines — put it back so the text still reads as words when
+        // copied or announced. Trailing whitespace collapses, so it draws
+        // nothing.
+        if (i < lines.length - 1) inner.appendChild(doc.createTextNode(' '));
+
+        const wrap = doc.createElement('span');
+        wrap.className = 'line';
+        wrap.appendChild(inner);
+        frag.appendChild(wrap);
+    });
+
+    el.textContent = '';
+    el.appendChild(frag);
+    el.classList.add('line-reveal');
+    return true;
+}
+
+/* updateLanguage() writes innerHTML into [data-i18n] elements, which would
+   shred the line structure — and the new text wraps differently anyway. So
+   put the un-split markup back before translating and re-split after. The
+   .active class stays on throughout: fresh nodes then compute straight to
+   their final position instead of replaying the slide. */
+function restoreLineReveals() {
+    lineReveals.forEach(rec => { rec.el.innerHTML = rec.html; });
+}
+
+function resplitLineReveals() {
+    lineReveals.forEach(rec => {
+        rec.html = rec.el.innerHTML;
+        splitIntoLines(rec.el);
+    });
 }
 
 /* ==========================================================================

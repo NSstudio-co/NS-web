@@ -1749,6 +1749,40 @@ ul {
 }
 
 /* ==========================================================================
+   M3 — Line Mask Reveal
+   Each visual line of a heading/subtitle slides up from behind its own mask.
+   JS builds the .line / .line-inner pairs after the fonts load; without JS
+   (or under reduced motion) the text is never split and stays as authored.
+   ========================================================================== */
+.js .line-reveal .line {
+    display: block;
+    overflow: hidden;
+    /* Czech diacritics (Č Ř Ů) sit above the cap height and would be shaved
+       off by the mask — grow the box upward, then pull it back in layout. */
+    padding-top: 0.14em;
+    margin-top: -0.14em;
+}
+
+.js .line-reveal .line-inner {
+    display: block;
+    transform: translateY(110%);
+    transition: transform 0.9s var(--ease-slow);
+    will-change: transform;
+}
+
+.js .line-reveal.active .line-inner {
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .js .line-reveal .line-inner {
+        transform: none;
+        transition: none;
+    }
+}
+
+/* ==========================================================================
    Blur Reveal Animations
    ========================================================================== */
 /* Gated behind .js (added by an inline head script) so content stays fully
