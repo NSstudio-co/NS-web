@@ -308,6 +308,13 @@ let currentLang = localStorage.getItem('ns-studio-clean-lang') || 'cs';
    element, not onto :root.
    ========================================================================== */
 const scrollCallbacks = [];
+// Drivers run at the top of the frame and may MOVE the page (M1's inertial
+// scroll is one). They return true while they still have work, which keeps
+// the loop ticking. Effects registered with onScroll() only read and write
+// their own elements, and always run after the drivers.
+const scrollDrivers = [];
+let requestScrollFrame = () => { };
+
 const scrollState = {
     y: window.scrollY,
     vh: window.innerHeight,
@@ -318,6 +325,10 @@ const scrollState = {
 function onScroll(fn) {
     scrollCallbacks.push(fn);
     fn(scrollState); // prime the effect with the current position
+}
+
+function onFrame(fn) {
+    scrollDrivers.push(fn);
 }
 
 function initScrollLoop() {
@@ -336,6 +347,13 @@ function initScrollLoop() {
 
     const tick = () => {
         queued = false;
+
+        // Drivers first: they set the scroll position for this frame, so the
+        // effects below see it immediately instead of one frame late.
+        let driving = false;
+        for (let i = 0; i < scrollDrivers.length; i++) {
+            if (scrollDrivers[i]()) driving = true;
+        }
 
         // All layout reads happen here, at the top of the frame and once —
         // callbacks below only write. Anything that needs a measurement takes
@@ -357,13 +375,15 @@ function initScrollLoop() {
             scrollCallbacks[i](scrollState);
         }
 
-        // Keep ticking while the velocity settles back to zero, otherwise the
-        // last frame of a scroll would leave it stuck mid-value.
-        if (smoothV > 0) schedule();
+        // Keep ticking while a driver is still moving the page, and while the
+        // velocity settles back to zero — otherwise the last frame of a scroll
+        // would leave it stuck mid-value.
+        if (driving || smoothV > 0) schedule();
     };
 
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule, { passive: true });
+    requestScrollFrame = schedule;
 
     tick();
 }
@@ -381,6 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentLang = document.documentElement.lang === 'en' ? 'en' : 'cs';
     }
     initScrollLoop(); // must come first — everything scroll-driven hangs off it
+    initSmoothScroll();
     initLineReveals(); // before initBlurReveals — it moves .blur-reveal around
     initBlurReveals();
     initSpotlightEffect();
@@ -946,6 +967,93 @@ function initTimeline() {
             timelineSteps.forEach(step => step.classList.add('active'));
         }
     });
+}
+
+/* ==========================================================================
+   M1 — Inertial scroll. The glide that ricardochance / grainient / jingjinghan
+   all get from Lenis, written out here because the house rule is no libraries.
+
+   The important detail: this drives the REAL scroll position every frame
+   (window.scrollTo) instead of translating a wrapper. That is what keeps
+   position: sticky, #anchors, keyboard scrolling, find-in-page and the
+   scrollbar working — a transform wrapper breaks all of them, and the beat
+   stage in M2 is sticky.
+
+   Only the wheel is intercepted. Touch keeps native momentum (better than
+   anything we would write), keyboard and anchors keep the browser's own
+   smooth behaviour, and both are left alone on purpose for accessibility.
+   ========================================================================== */
+function initSmoothScroll() {
+    // Touch devices already have momentum, and reduced motion means no glide.
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const LERP = 0.135;       // higher = tighter to the wheel, lower = floatier
+    const LINE_HEIGHT = 16;   // deltaMode 1 is in lines, not pixels
+
+    let target = window.scrollY;
+    let current = target;
+    let running = false;
+
+    const maxScroll = () =>
+        Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+
+    // Don't steal the wheel from something that can scroll on its own.
+    const overNestedScroller = (node) => {
+        for (let el = node; el && el !== document.body; el = el.parentElement) {
+            if (el.hasAttribute && el.hasAttribute('data-native-scroll')) return true;
+            const style = getComputedStyle(el);
+            if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1) return true;
+        }
+        return false;
+    };
+
+    // Runs inside the one scroll-loop rAF (house rule: a single rAF for the
+    // whole site), before the effects, so they see this frame's position.
+    onFrame(() => {
+        if (!running) return false;
+        current += (target - current) * LERP;
+        if (Math.abs(target - current) < 0.4) {
+            current = target;
+            running = false;
+        }
+        // 'instant' matters: html has scroll-behavior: smooth for anchors, and
+        // without this every frame would start its own easing on top of ours.
+        window.scrollTo({ top: current, left: 0, behavior: 'instant' });
+        return running;
+    });
+
+    const start = () => {
+        running = true;
+        requestScrollFrame();
+    };
+
+    window.addEventListener('wheel', (e) => {
+        if (e.ctrlKey) return;                    // pinch zoom
+        if (overNestedScroller(e.target)) return;
+        e.preventDefault();
+
+        const unit = e.deltaMode === 1 ? LINE_HEIGHT : e.deltaMode === 2 ? window.innerHeight : 1;
+        target = Math.max(0, Math.min(target + e.deltaY * unit, maxScroll()));
+        start();
+    }, { passive: false });
+
+    // Anything that moves the page without us — scrollbar drag, keyboard,
+    // an #anchor, focus, find-in-page — resyncs the target so the next wheel
+    // tick continues from where the page actually is.
+    onScroll(({ y }) => {
+        if (!running) {
+            target = y;
+            current = y;
+        }
+    });
+
+    // A same-page anchor hands control to the browser's own smooth scroll;
+    // stepping aside avoids two animations pulling at the same position.
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest && e.target.closest('a[href^="#"]');
+        if (link) running = false;
+    }, true);
 }
 
 /* ==========================================================================

@@ -183,7 +183,8 @@ Pravidla pro všechny animace — luxus je v decentnosti, ne v množství:
 - **Jen `transform` a `opacity`** (+ `clip-path` u reveal efektů). Nikdy neanimuj layout vlastnosti (width/height/top/margin).
 - Easing tokeny: vše jede na existujících `--ease-smooth` / `--ease-slow`. Délky: mikrointerakce 0.3–0.4 s, reveal efekty 0.8–1.1 s, stagger krok 60–90 ms.
 - **Každá animace musí mít vypínač přes `prefers-reduced-motion: reduce`** — obsah rovnou viditelný, bez pohybu. Bez výjimky.
-- Jeden globální `IntersectionObserver` + max jeden `requestAnimationFrame` scroll handler pro celý web. Žádné scroll-jacking / smooth-scroll knihovny.
+- Jeden globální `IntersectionObserver` + max jeden `requestAnimationFrame` scroll handler pro celý web (dnes `initScrollLoop()` — nový scroll efekt se registruje přes `onScroll()`, nikdy vlastním listenerem). Žádné knihovny na scroll-jacking / smooth-scroll.
+- **Setrvačný scroll: povolen, vlastní implementace** (rozhodnutí majitele 2026-08-10, viz M1 v `MOTION-PLAN.md`). `initSmoothScroll()` posouvá **nativní** `scrollTop` každý frame, ne transform wrapper — jen tak zůstane funkční `position: sticky` (potřebuje ho M2), kotvy, klávesnice i scrollbar. Odchytává se **pouze kolečko**; dotyk, klávesnice a kotvy zůstávají nativní. Vypnuto na dotykových zařízeních a při `prefers-reduced-motion`. Knihovna (Lenis apod.) je pořád zakázaná.
 - Animace hrají **jednou** (`observer.unobserve` po aktivaci) — při scrollu zpět nahoru už nic nebliká.
 - Po každé animaci ověř v DevTools Performance, že scroll drží 60 fps na mobilním throttlingu.
 
