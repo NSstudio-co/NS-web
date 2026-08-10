@@ -384,7 +384,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initSpotlightEffect();
     initNavbar();
     initMobileMenu();
-    initTimeline();
+    initTimeline(); // subpages only — the homepage now runs initBeatStage()
+    initBeatStage();
     initPointerAmbience();
     initFAQ();
     initContactForm();
@@ -941,6 +942,87 @@ function initTimeline() {
             timelineSteps.forEach(step => step.classList.add('active'));
         }
     });
+}
+
+/* ==========================================================================
+   M2 — Process scroll stage. The section pins itself for four viewport
+   heights and one browser mockup is built up beat by beat as you scroll:
+   empty frame -> wireframe -> content -> live site with a rising chart.
+
+   Two custom properties carry the state, both written onto .beat-stage so
+   the style invalidation stays inside this one section (writing them on
+   :root would re-style the whole document every frame — see initScrollLoop):
+     --p    0..1 through the whole pinned section
+     --sub  0..1 within the current beat, which is what scrubs the chart
+   The coarse state (which beat) is a data attribute rather than an
+   interpolation: cheaper, and the CSS reads like the storyboard.
+   ========================================================================== */
+function initBeatStage() {
+    const track = document.querySelector('.beat-track');
+    const stage = track && track.querySelector('.beat-stage');
+    if (!track || !stage) return;
+
+    const items = Array.from(stage.querySelectorAll('.beat-item'));
+    if (!items.length) return;
+
+    // Below 900px the stage is not pinned (a sticky scene on a phone is just
+    // a small picture that refuses to leave), and reduced motion gets the
+    // same plain list. CSS already lays both out — JS just stops driving it.
+    const flat = window.matchMedia('(max-width: 900px), (prefers-reduced-motion: reduce)');
+
+    let trackTop = 0;
+    let travel = 1;
+    let beat = -1;
+
+    const measure = () => {
+        trackTop = track.getBoundingClientRect().top + window.scrollY;
+        // The stage is pinned from the moment the track's top reaches the top
+        // of the viewport until its bottom does — that span is the travel.
+        travel = Math.max(1, track.offsetHeight - window.innerHeight);
+    };
+
+    const setBeat = (i) => {
+        if (i === beat) return;
+        beat = i;
+        stage.dataset.beat = String(i + 1);
+        items.forEach((item, n) => item.classList.toggle('active', n === i));
+    };
+
+    const flatten = () => {
+        stage.style.removeProperty('--p');
+        stage.style.removeProperty('--sub');
+        stage.dataset.beat = String(items.length);
+        items.forEach(item => item.classList.add('active'));
+        beat = -1;
+    };
+
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    let lastP = -1;
+
+    onScroll(({ y }) => {
+        if (flat.matches) return;
+        const p = Math.max(0, Math.min((y - trackTop) / travel, 1));
+        // Above and below the section p is pinned at 0 / 1. Writing the same
+        // value again would still invalidate the whole stage subtree every
+        // frame — which cost 12 frames over 33ms across a full-page scroll at
+        // 4x throttling before this guard.
+        if (p === lastP) return;
+        lastP = p;
+
+        const i = Math.min(items.length - 1, Math.floor(p * items.length));
+        stage.style.setProperty('--p', p.toFixed(4));
+        stage.style.setProperty('--sub', (p * items.length - i).toFixed(4));
+        setBeat(i);
+    });
+
+    const sync = () => {
+        if (flat.matches) flatten();
+        else measure();
+    };
+    flat.addEventListener('change', sync);
+    sync();
 }
 
 /* ==========================================================================

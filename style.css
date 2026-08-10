@@ -2179,3 +2179,388 @@ ul {
         margin: 0 auto;
     }
 }
+
+/* ==========================================================================
+   M2 — Process scroll stage
+   The section pins itself for four viewport-heights and one browser mockup is
+   built up beat by beat: empty frame -> wireframe -> content -> live site with
+   a chart. Two custom properties drive it, both written by JS onto .beat-stage
+   (never onto :root — see the note on the scroll loop in script.js):
+     --p    0..1 progress through the whole pinned section
+     --sub  0..1 progress within the current beat, for the scrubbed bits
+   Everything animated here is gated behind .js, so without JavaScript the
+   track collapses and the four beats read as a plain list.
+   ========================================================================== */
+.beat-track {
+    position: relative;
+}
+
+.js .beat-track {
+    height: 400vh;
+    /* 4 beats x 100vh */
+}
+
+.js .beat-stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    padding-top: var(--nav-height);
+}
+
+.beat-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+    width: 100%;
+}
+
+/* --- left column: the four beats ------------------------------------------ */
+.beat-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1.25rem, 2.4vw, 2.25rem);
+}
+
+.js .beat-list {
+    /* rides the scroll a little so the column is never quite static */
+    transform: translateY(calc(var(--p, 0) * -14px));
+}
+
+.beat-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.15rem;
+    align-items: start;
+}
+
+.js .beat-item {
+    opacity: 0.22;
+    transform: translateY(10px);
+    transition: opacity 0.5s var(--ease-slow), transform 0.5s var(--ease-slow);
+}
+
+.js .beat-item.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.beat-num {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--accent);
+    padding-top: 0.1em;
+}
+
+.beat-copy h3 {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.beat-copy p {
+    margin-top: 0.4rem;
+    max-width: 44ch;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+/* --- right column: the scene ---------------------------------------------- */
+.beat-scene {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px;
+    gap: clamp(1rem, 2vw, 1.75rem);
+    align-items: stretch;
+}
+
+.scene-browser {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    overflow: hidden;
+}
+
+.js .scene-browser {
+    transform: translateY(calc(var(--p, 0) * -18px));
+}
+
+.scene-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.scene-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+}
+
+.scene-url {
+    margin-left: 10px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    transition: color 0.6s var(--ease-slow), opacity 0.6s var(--ease-slow);
+}
+
+.js .scene-url {
+    opacity: 0;
+}
+
+.js [data-beat="3"] .scene-url,
+.js [data-beat="4"] .scene-url {
+    opacity: 1;
+}
+
+.js [data-beat="4"] .scene-url {
+    color: var(--text-muted);
+}
+
+.scene-canvas {
+    position: relative;
+    height: calc(100% - 38px);
+    padding: clamp(0.6rem, 1.3vw, 1rem);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: min-content;
+    align-content: start;
+    gap: clamp(0.4rem, 0.8vw, 0.65rem);
+}
+
+.scene-grid {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.11) 1px, transparent 1px);
+    background-size: 22px 22px;
+    transition: opacity 0.8s var(--ease-slow);
+    pointer-events: none;
+}
+
+.js [data-beat="3"] .scene-grid,
+.js [data-beat="4"] .scene-grid {
+    opacity: 0.2;
+}
+
+/* wireframe blocks — outlined at beat 02, filled from beat 03 on */
+.wire {
+    position: relative;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    transition: opacity 0.55s var(--ease-slow), transform 0.55s var(--ease-slow),
+        background-color 0.55s var(--ease-slow), border-color 0.55s var(--ease-slow);
+    transition-delay: calc(var(--i, 0) * 55ms);
+}
+
+.js .wire {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.js [data-beat="2"] .wire,
+.js [data-beat="3"] .wire,
+.js [data-beat="4"] .wire {
+    opacity: 1;
+    transform: none;
+}
+
+.js [data-beat="3"] .wire,
+.js [data-beat="4"] .wire {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: var(--card-border-hover);
+}
+
+.wire-nav {
+    grid-column: 1 / -1;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+}
+
+.wire-hero {
+    grid-column: 1 / 3;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 12px;
+}
+
+.wire-media {
+    grid-column: 3;
+    min-height: 84px;
+    display: grid;
+    place-items: center;
+    color: var(--text-faint);
+}
+
+.wire-media svg {
+    width: 38%;
+    height: auto;
+}
+
+.wire-card {
+    min-height: 42px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 10px;
+}
+
+/* the content that lands inside the wireframe at beat 03 */
+.fill {
+    display: block;
+    border-radius: 2px;
+    background: var(--text-faint);
+    transform-origin: left;
+    transition: opacity 0.5s var(--ease-slow), transform 0.6s var(--ease-slow);
+    transition-delay: calc(var(--i, 0) * 55ms);
+}
+
+.js .fill {
+    opacity: 0;
+    transform: scaleX(0.35);
+}
+
+.js [data-beat="3"] .fill,
+.js [data-beat="4"] .fill {
+    opacity: 1;
+    transform: none;
+}
+
+.fill-mark {
+    width: 26px;
+    height: 8px;
+    background: var(--text-muted);
+}
+
+.fill-link {
+    width: 16px;
+    height: 5px;
+}
+
+.wire-nav .fill-link:nth-of-type(2) {
+    margin-left: auto;
+}
+
+.fill-head {
+    width: 68%;
+    height: 13px;
+    background: var(--text-primary);
+}
+
+.fill-line {
+    width: 86%;
+    height: 6px;
+}
+
+.fill-line--short {
+    width: 58%;
+}
+
+.fill-btn {
+    width: 68px;
+    height: 17px;
+    margin-top: 3px;
+    border-radius: 3px;
+    background: var(--text-primary);
+}
+
+/* the payoff: bars that grow with the wheel through beat 04 */
+.scene-chart {
+    grid-column: 1 / -1;
+    height: 52px;
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(6px, 1.2vw, 12px);
+}
+
+.chart-bar {
+    flex: 1;
+    height: 100%;
+    border-radius: 2px 2px 0 0;
+    background: linear-gradient(180deg, var(--text-primary), var(--text-faint));
+    transform-origin: bottom;
+    transform: scaleY(var(--bar, 1));
+    transition: opacity 0.4s var(--ease-slow);
+}
+
+.js .chart-bar {
+    opacity: 0;
+    transform: scaleY(0);
+}
+
+.js [data-beat="4"] .chart-bar {
+    opacity: 1;
+    /* --sub is the progress inside beat 04, so the chart is scrubbed by the
+       wheel rather than played back on a timer. The 1.35 lets it top out
+       slightly before the section releases. */
+    transform: scaleY(calc(var(--bar, 1) * min(var(--sub, 0) * 1.35, 1)));
+}
+
+/* progress rail — the one thing that moves continuously the whole way */
+.scene-rail {
+    position: relative;
+    background: var(--card-border);
+}
+
+.scene-rail-fill {
+    position: absolute;
+    inset: 0;
+    background: var(--text-muted);
+    transform: scaleY(var(--p, 0));
+    transform-origin: top;
+}
+
+/* Small screens and reduced motion: no pinning, no scene — the beats are
+   just four blocks in a row, which is all a 390px screen can carry anyway. */
+@media (max-width: 900px),
+(prefers-reduced-motion: reduce) {
+
+    .js .beat-track {
+        height: auto;
+    }
+
+    .js .beat-stage {
+        position: static;
+        height: auto;
+        display: block;
+        padding-top: 0;
+    }
+
+    .beat-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .js .beat-list {
+        transform: none;
+    }
+
+    .js .beat-item {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    .beat-scene {
+        display: none;
+    }
+}

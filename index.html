@@ -785,40 +785,107 @@
                 <h2 class="section-title"><span data-i18n="process_title_a">Jak to</span> <em data-i18n="process_title_em">probíhá</em></h2>
             </div>
 
-            <div class="timeline-container">
-                <div class="timeline-track">
-                    <div class="timeline-fill" id="timeline-fill"></div>
-                </div>
+        </div>
 
-                <div class="timeline-steps">
-                    <div class="timeline-step step-1" data-step="1">
-                        <span class="step-num">01</span>
-                        <div class="step-content blur-reveal">
-                            <h3 data-i18n="step1_title">Discovery Call</h3>
-                            <p data-i18n="step1_desc">Probereme vaši vizi a najdeme společnou řeč. Jednoduché a k věci.
-                            </p>
+        <!-- M2: the section pins itself and one browser mockup is built up
+             through four beats as you scroll. Without JS (no .js class) the
+             track collapses and the beats read as four cards. -->
+        <div class="beat-track">
+            <div class="beat-stage" data-beat="1">
+                <div class="container beat-layout">
+                    <ol class="beat-list">
+                        <li class="beat-item active" data-beat="1">
+                            <span class="beat-num">01</span>
+                            <div class="beat-copy">
+                                <h3 data-i18n="step1_title">Discovery Call</h3>
+                                <p data-i18n="step1_desc">Probereme vaši vizi a najdeme společnou řeč. Jednoduché a k
+                                    věci.</p>
+                            </div>
+                        </li>
+                        <li class="beat-item" data-beat="2">
+                            <span class="beat-num">02</span>
+                            <div class="beat-copy">
+                                <h3 data-i18n="step2_title">Design & Wireframing</h3>
+                                <p data-i18n="step2_desc">Vytvoříme precizní návrh zaměřený na obsah a čistotu rozhraní.
+                                </p>
+                            </div>
+                        </li>
+                        <li class="beat-item" data-beat="3">
+                            <span class="beat-num">03</span>
+                            <div class="beat-copy">
+                                <h3 data-i18n="step3_title">Development</h3>
+                                <p data-i18n="step3_desc">Píšeme čistý kód. Důraz na ohromující výkon a plynulé
+                                    interakce.</p>
+                            </div>
+                        </li>
+                        <li class="beat-item" data-beat="4">
+                            <span class="beat-num">04</span>
+                            <div class="beat-copy">
+                                <h3 data-i18n="step4_title">Launch</h3>
+                                <p data-i18n="step4_desc">Finální testování, nasazení na doménu a předání. Váš web jde
+                                    do světa.</p>
+                            </div>
+                        </li>
+                    </ol>
+
+                    <div class="beat-scene" aria-hidden="true">
+                        <div class="scene-browser">
+                            <div class="scene-bar">
+                                <span class="scene-dot"></span>
+                                <span class="scene-dot"></span>
+                                <span class="scene-dot"></span>
+                                <span class="scene-url">vase-firma.cz</span>
+                            </div>
+                            <div class="scene-canvas">
+                                <div class="scene-grid"></div>
+
+                                <div class="wire wire-nav" style="--i:0">
+                                    <span class="fill fill-mark"></span>
+                                    <span class="fill fill-link"></span>
+                                    <span class="fill fill-link"></span>
+                                    <span class="fill fill-link"></span>
+                                </div>
+
+                                <div class="wire wire-hero" style="--i:1">
+                                    <span class="fill fill-head"></span>
+                                    <span class="fill fill-line"></span>
+                                    <span class="fill fill-line fill-line--short"></span>
+                                    <span class="fill fill-btn"></span>
+                                </div>
+
+                                <div class="wire wire-media" style="--i:2">
+                                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5"
+                                        aria-hidden="true">
+                                        <circle cx="17" cy="17" r="5" />
+                                        <path d="M4 40l14-14 12 12 8-8 10 10" />
+                                    </svg>
+                                </div>
+
+                                <div class="wire wire-card" style="--i:3">
+                                    <span class="fill fill-line"></span>
+                                    <span class="fill fill-line fill-line--short"></span>
+                                </div>
+                                <div class="wire wire-card" style="--i:4">
+                                    <span class="fill fill-line"></span>
+                                    <span class="fill fill-line fill-line--short"></span>
+                                </div>
+                                <div class="wire wire-card" style="--i:5">
+                                    <span class="fill fill-line"></span>
+                                    <span class="fill fill-line fill-line--short"></span>
+                                </div>
+
+                                <div class="scene-chart">
+                                    <span class="chart-bar" style="--bar:0.35"></span>
+                                    <span class="chart-bar" style="--bar:0.52"></span>
+                                    <span class="chart-bar" style="--bar:0.44"></span>
+                                    <span class="chart-bar" style="--bar:0.78"></span>
+                                    <span class="chart-bar" style="--bar:1"></span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="timeline-step step-2" data-step="2">
-                        <span class="step-num">02</span>
-                        <div class="step-content blur-reveal">
-                            <h3 data-i18n="step2_title">Design & Wireframing</h3>
-                            <p data-i18n="step2_desc">Vytvoříme precizní návrh zaměřený na obsah a čistotu rozhraní.</p>
-                        </div>
-                    </div>
-                    <div class="timeline-step step-3" data-step="3">
-                        <span class="step-num">03</span>
-                        <div class="step-content blur-reveal">
-                            <h3 data-i18n="step3_title">Development</h3>
-                            <p data-i18n="step3_desc">Píšeme čistý kód. Důraz na ohromující výkon a plynulé interakce.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="timeline-step step-4" data-step="4">
-                        <span class="step-num">04</span>
-                        <div class="step-content blur-reveal">
-                            <h3 data-i18n="step4_title">Launch</h3>
-                            <p data-i18n="step4_desc">Finální testování, nasazení na doménu a předání. Váš web jde do světa.</p>
+
+                        <div class="scene-rail">
+                            <span class="scene-rail-fill"></span>
                         </div>
                     </div>
                 </div>
