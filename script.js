@@ -51,6 +51,7 @@ const translations = {
         portfolio_title_a: "Naše",
         portfolio_title_em: "práce",
         portfolio_sub: "Vybrané projekty, které fungují v praxi",
+        manifest_text: "Neděláme šablony. Děláme weby, které vydělávají.",
         portfolio_cat_1: "Gastro · One-page",
         portfolio_cat_2: "Marketing · Kampaně",
         portfolio_cat_3: "Aplikace · Automatizace",
@@ -181,6 +182,7 @@ const translations = {
         portfolio_title_a: "Our",
         portfolio_title_em: "Work",
         portfolio_sub: "Proven concepts working in practice",
+        manifest_text: "We don't do templates. We build sites that earn.",
         portfolio_cat_1: "Restaurant · One-page",
         portfolio_cat_2: "Marketing · Campaigns",
         portfolio_cat_3: "App · Automation",
@@ -386,6 +388,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initMobileMenu();
     initTimeline(); // subpages only — the homepage now runs initBeatStage()
     initBeatStage();
+    initManifest();
     initPointerAmbience();
     initFAQ();
     initContactForm();
@@ -420,6 +423,7 @@ function updateLanguage(lang) {
     });
 
     resplitLineReveals(); // the new text wraps differently — measure again
+    resplitManifest();
 
     document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
@@ -942,6 +946,67 @@ function initTimeline() {
             timelineSteps.forEach(step => step.classList.add('active'));
         }
     });
+}
+
+/* ==========================================================================
+   M8 — Manifest. One sentence between sections, split into words that light
+   up one after another as the section scrolls past. The word index and a
+   single --lit counter do the whole thing in CSS: opacity per word is
+   clamp(dim, (lit - index) * k, 1), so the lit edge sweeps across the line
+   in step with the wheel. --lit lands on the sentence element, not :root.
+   ========================================================================== */
+const manifestState = { el: null };
+
+function initManifest() {
+    const section = document.querySelector('.manifest');
+    const text = section && section.querySelector('.manifest-text');
+    if (!section || !text) return;
+
+    manifestState.el = text;
+    splitManifestWords(text);
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let top = 0;
+    let travel = 1;
+    let lastP = -1;
+
+    const measure = () => {
+        top = section.getBoundingClientRect().top + window.scrollY;
+        travel = Math.max(1, section.offsetHeight - window.innerHeight);
+    };
+
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    onScroll(({ y }) => {
+        if (reduce.matches) return;
+        const p = Math.max(0, Math.min((y - top) / travel, 1));
+        if (p === lastP) return; // same guard as the beat stage
+        lastP = p;
+        // +2 so the last word is fully lit before the sentence scrolls off
+        const words = text.querySelectorAll('.mword').length;
+        text.style.setProperty('--lit', (p * (words + 2)).toFixed(3));
+    });
+}
+
+function splitManifestWords(el) {
+    const words = (el.textContent || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return;
+
+    el.textContent = '';
+    words.forEach((word, i) => {
+        const span = document.createElement('span');
+        span.className = 'mword';
+        span.style.setProperty('--wi', String(i));
+        span.textContent = word;
+        el.appendChild(span);
+        if (i < words.length - 1) el.appendChild(document.createTextNode(' '));
+    });
+}
+
+/* updateLanguage() overwrites the sentence with plain text — split it again. */
+function resplitManifest() {
+    if (manifestState.el) splitManifestWords(manifestState.el);
 }
 
 /* ==========================================================================

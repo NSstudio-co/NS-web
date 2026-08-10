@@ -2564,3 +2564,69 @@ ul {
         display: none;
     }
 }
+
+/* ==========================================================================
+   M8 — Manifest
+   One sentence between sections whose words light up with the scroll. JS
+   splits it and writes a single --lit counter onto the sentence; each word
+   knows its own index, so the opacity ramp sweeps along the line as --lit
+   grows. No transition on purpose — the wheel is the timeline.
+   ========================================================================== */
+.manifest {
+    position: relative;
+}
+
+.js .manifest {
+    height: 180vh;
+}
+
+.manifest-sticky {
+    display: grid;
+    place-items: center;
+    padding: clamp(5rem, 12vh, 9rem) 5%;
+}
+
+.js .manifest-sticky {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 0 5%;
+}
+
+.manifest-text {
+    max-width: 22ch;
+    margin: 0 auto;
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3.25rem);
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
+.mword {
+    display: inline-block;
+}
+
+.js .mword {
+    /* (lit - index) crosses 0 -> 1 over roughly one word, so the boundary
+       reads as a soft edge sweeping the sentence rather than a hard cut. */
+    opacity: clamp(0.14, calc((var(--lit, 0) - var(--wi, 0)) * 0.85), 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .js .manifest {
+        height: auto;
+    }
+
+    .js .manifest-sticky {
+        position: static;
+        height: auto;
+        padding: clamp(5rem, 12vh, 9rem) 5%;
+    }
+
+    .js .mword {
+        opacity: 1;
+    }
+}
