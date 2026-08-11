@@ -81,7 +81,21 @@ Po revertu M11 si majitel vyžádal, ať horní část zůstane animovaná — *
 - **Pod 480 px a při reduced motion** se nezapisuje vůbec; 481–768 px má kratší posun (−22 px). Bez JS beze změny.
 - Perf: prokládané A/B proti stavu před M11 — **avg 16,7 ms / 0 framů přes 33 ms** na obou stranách. Mimo hero nula zápisů, `will-change` zpátky na `auto`.
 
-### Hotovo (2026-08-11) — Služby: kreslená ikona, ztlumení sourozenců, rolující titulek
+### Hotovo (2026-08-11) — Služby jako mřížka dlaždic, co se otevírají
+
+Přání majitele: zmenšit karty na dlaždice a popis ukázat až po najetí. Sekce se zkrátila **ze 726 na 410 px**, mřížka je 4sloupcová, dlaždice 252×126 px.
+
+- **Nic se nepřeskládá.** Řádky mají pevnou výšku (`grid-auto-rows: var(--svc-tile)`) a karty `align-self: start`, takže rozbalená karta **přeteče přes řádek pod sebou místo aby ho odsunula**. Ověřeno měřením: pozice ostatních deseti karet i výška mřížky jsou před hoverem a při něm identické. To je podstatné, protože `AGENTS.md` zakazuje animovat layout vlastnosti — jediné, co tu mění rozměr, je ta jedna karta pod kurzorem, technikou `grid-template-rows: 0fr → 1fr`, kterou už používá FAQ akordeon.
+- `--svc-tile: 126px` musí sedět na klidovou výšku (ikona + titulek + padding). Když neseděla, karty o 10 px přetékaly už v klidu.
+- **Efekt C (rolující titulek) tím padl** — popis teď vysvětluje sám, takže odrolovat k tomu ještě název by bylo moc. Klíč `svc_more` i jeho rozpěrka odstraněny, ať tam neleží mrtvý kód.
+- **Pod 901 px, na dotyku a při reduced motion se kompaktní mřížka nepouští vůbec** a sekce vypadá jako dosud: 2 nebo 1 sloupec, všechny popisy vidět. Schovat vysvětlení za interakci, která na dotyku neexistuje, by ten text prostě smazalo. Ověřeno na 1440 / 1100 / 950 / 900 / 800 / 600 / 390 px, nikde se nezalomí titulek.
+- Bez JS to funguje taky — je to čisté CSS, hover nepotřebuje JavaScript.
+
+**Pozor na pořadí v souboru:** blok musí být **za** základním `.services-index-grid` pravidlem, jinak prohraje na pořadí při stejné specificitě (napoprvé zůstaly 3 sloupce místo 4).
+
+Perf: **avg 16,7 ms / 0 framů přes 33 ms**.
+
+### Hotovo (2026-08-11) — Služby: kreslená ikona a ztlumení sourozenců
 
 Tři efekty na mřížku 11 karet, **všechny bez jediného nového assetu**.
 

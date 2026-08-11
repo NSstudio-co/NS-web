@@ -86,6 +86,11 @@
     --ease-slow: cubic-bezier(0.16, 1, 0.3, 1);
     --nav-height: 80px;
 
+    /* Rest height of a services tile — the row track is fixed to this so an
+       opening card overflows its row instead of pushing the grid around.
+       Must match the icon + title + padding, or cards overlap at rest. */
+    --svc-tile: 126px;
+
     /* Pinned hero. --hero-stage is the height of the pinned stage, --hero-pin
        how many extra stage-heights it stays pinned for: 1.5 means progress
        0 -> 1 spans 150vh of scrolling. Set it to 1 for a shorter hold.
@@ -1247,20 +1252,7 @@ ul {
     }
 }
 
-/* C — the service title rolls to "find out more", reusing the M9 label
-   machinery the buttons and the portfolio already use. */
-.js .spotlight-card:hover .btn-label-in,
-.js .spotlight-card:focus-visible .btn-label-in {
-    transform: translateY(-100%);
-}
 
-.spotlight-card h3 .btn-label-in::after {
-    font-family: var(--font-mono);
-    font-size: 0.72em;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--accent);
-}
 
 @media (prefers-reduced-motion: reduce) {
 
@@ -1545,22 +1537,6 @@ ul {
    Scoped to real pointers: on touch the roll never runs, so there is no
    reason to let it widen the caption and squeeze the category beside it. */
 @media (hover: hover) and (pointer: fine) {
-    /* The service titles roll to a different typography than the portfolio
-       names, so they need their own sizer or it measures the wrong string
-       width and clips. */
-    .spotlight-card h3 .btn-label[data-alt]::after {
-        content: attr(data-alt);
-        display: block;
-        height: 0;
-        overflow: hidden;
-        visibility: hidden;
-        font-family: var(--font-mono);
-        font-size: 0.72em;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        white-space: nowrap;
-    }
-
     .portfolio-name .btn-label[data-alt]::after {
         content: attr(data-alt);
         display: block;
@@ -2704,6 +2680,64 @@ ul {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==========================================================================
+   Compact tiles that open on hover. At rest a card is just its icon and name;
+   hovering it reveals the line of explanation underneath.
+
+   Crucially this reflows NOTHING. The grid rows are a fixed height and the
+   cards are align-self: start, so a card taller than its row overflows it
+   instead of stretching it — the ten other cards never move. That matters
+   because AGENTS.md forbids animating layout properties: the only thing that
+   resizes is the one card under the pointer, using the same
+   grid-template-rows 0fr -> 1fr technique the FAQ accordion already uses.
+   ========================================================================== */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) and (min-width: 901px) {
+    .services-index-grid {
+        grid-template-columns: repeat(4, 1fr);
+        grid-auto-rows: var(--svc-tile, 126px);
+        align-items: start;
+    }
+
+    .services-index-grid .spotlight-card {
+        align-self: start;
+        min-height: var(--svc-tile, 126px);
+    }
+
+    /* Lifts over the row below as it opens, and over its own neighbours. */
+    .services-index-grid .spotlight-card:hover,
+    .services-index-grid .spotlight-card:focus-visible {
+        z-index: 20;
+    }
+
+    .services-index-grid .card-reveal {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.45s var(--ease-smooth);
+    }
+
+    .services-index-grid .spotlight-card:hover .card-reveal,
+    .services-index-grid .spotlight-card:focus-visible .card-reveal {
+        grid-template-rows: 1fr;
+    }
+
+    .services-index-grid .card-desc {
+        min-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition: opacity 0.35s var(--ease-smooth) 0.08s;
+    }
+
+    .services-index-grid .spotlight-card:hover .card-desc,
+    .services-index-grid .spotlight-card:focus-visible .card-desc {
+        opacity: 1;
+    }
+}
+
+/* Touch has no hover and reduced motion opts out above, so in both cases the
+   grid stays exactly as it is today: three (or fewer) columns, every card the
+   same height, every description on show. Hiding an explanation behind an
+   interaction that doesn't exist would just delete the content. */
 
 /* Footer link columns (Služby + Menu) */
 .footer-content {
