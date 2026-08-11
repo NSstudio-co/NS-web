@@ -141,6 +141,15 @@ body.clean-theme {
     opacity: 1;
 }
 
+/* Matching fade OUT on internal navigation (initPageTransitions). Faster than
+   the entrance on purpose — the visitor has already decided to leave, so this
+   only needs to cover the white flash, not perform. Keep the duration in sync
+   with PAGE_EXIT_MS in script.js. */
+.js body.clean-theme.page-leaving {
+    opacity: 0;
+    transition: opacity 0.18s var(--ease-smooth);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .js body.clean-theme {
         opacity: 1;
@@ -1643,7 +1652,8 @@ ul {
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
     background: #0f0f11;
     border: 1px solid var(--card-border);
     border-radius: 8px;
@@ -1655,22 +1665,134 @@ ul {
     resize: none;
 }
 
+/* The native select arrow is drawn by the OS in the OS's colours, which on a
+   near-black card reads as a light-mode artefact. Draw our own instead —
+   inline SVG so it stays an external-request-free page. */
+.form-group select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 2.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8781' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    background-size: 16px;
+    cursor: pointer;
+}
+
+/* The dropdown itself is painted by the OS, so it needs explicit colours or
+   the options render as dark text on dark. */
+.form-group select option {
+    background: #0f0f11;
+    color: var(--text-primary);
+}
+
 .form-group input::placeholder,
 .form-group textarea::placeholder {
     color: var(--text-faint);
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
     outline: none;
     border-color: var(--text-muted);
 }
 
 .form-group input:focus-visible,
-.form-group textarea:focus-visible {
+.form-group textarea:focus-visible,
+.form-group select:focus-visible {
     outline: 2px solid var(--text-primary);
     outline-offset: 2px;
     border-color: var(--text-primary);
+}
+
+/* "optional" tag inside a label — the label is already uppercase mono, so
+   this just drops the weight rather than introducing a second treatment. */
+.form-optional {
+    text-transform: none;
+    letter-spacing: 0.02em;
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    opacity: 0.7;
+}
+
+/* Package / service chip — only rendered when the contact page was reached
+   from a pricing card or a service page, so the visitor can see what carried
+   over and drop it if it was a misclick. */
+.form-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    align-self: flex-start;
+    max-width: 100%;
+    padding: 0.5rem 0.5rem 0.5rem 0.9rem;
+    border: 1px solid var(--card-border-hover);
+    border-radius: 999px;
+    background: var(--accent-soft);
+}
+
+.form-chip[hidden] {
+    display: none;
+}
+
+.form-chip-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-faint);
+}
+
+.form-chip-name {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--accent);
+}
+
+.form-chip-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: color 0.2s var(--ease-smooth), background-color 0.2s var(--ease-smooth);
+}
+
+.form-chip-clear:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.form-chip-clear:focus-visible {
+    outline: 2px solid var(--text-primary);
+    outline-offset: 2px;
+}
+
+/* The chip appears after load, so it animates in rather than popping. */
+.js .form-chip {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.5s var(--ease-slow), transform 0.5s var(--ease-slow);
+}
+
+.js .form-chip.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .js .form-chip {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
 }
 
 .form-submit {
@@ -2187,7 +2309,8 @@ ul {
 }
 
 /* ==========================================================================
-   Pricing packages (homepage) — three tiers linking down to the contact form
+   Pricing packages (homepage) — three tiers linking to /kontakt.html with the
+   chosen package carried in the query string
    ========================================================================== */
 .pricing-grid {
     display: grid;

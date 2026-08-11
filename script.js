@@ -96,6 +96,9 @@ const translations = {
         pack3_f4: "Video a dronové záběry",
         pack3_f5: "Branding a jednotný vizuál",
         form_package_msg: "Dobrý den, mám zájem o balíček {name}.",
+        form_service_msg: "Dobrý den, mám zájem o službu {name}.",
+        form_chip_package: "Vybraný balíček",
+        form_chip_service: "Vybraná služba",
         contact_title: "Začněme tvořit",
         contact_subtitle: "Hledáte design, který nekřičí, ale rezonuje?",
         team_label: "Tým",
@@ -227,6 +230,9 @@ const translations = {
         pack3_f4: "Video & drone footage",
         pack3_f5: "Branding & unified visuals",
         form_package_msg: "Hi, I'm interested in the {name} package.",
+        form_service_msg: "Hi, I'm interested in your {name} service.",
+        form_chip_package: "Selected package",
+        form_chip_service: "Selected service",
         contact_title: "Let's start building",
         contact_subtitle: "Looking for a design that resonates without shouting?",
         team_label: "Team",
@@ -413,7 +419,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initPointerAmbience();
     initFAQ();
     initContactForm();
-    initPricingCards();
+    initContactPrefill();
+    initPageTransitions();
     initScrollProgress();
     initMagneticButtons();
     initRotatingWords();
@@ -1510,26 +1517,128 @@ function initContactForm() {
    Pricing package cards — the anchor scrolls to #contact, we tag the
    Formspree submission and pre-fill the message with the chosen package
    ========================================================================== */
-function initPricingCards() {
-    const cards = document.querySelectorAll('.pricing-card');
-    const packageInput = document.getElementById('form-balicek');
+/* Slugs that may arrive on the contact page as ?balicek= / ?sluzba=.
+   They are language-stable on purpose: the display name changes between CS
+   and EN (Základní / Starter), so putting the name in the URL would break
+   the moment a visitor switched language or shared the link. The values are
+   existing translation keys, so no new copy is needed for the names. */
+const CONTACT_PACKAGES = {
+    zakladni: 'pack1_name',
+    pokrocily: 'pack2_name',
+    kompletni: 'pack3_name'
+};
+
+const CONTACT_SERVICES = {
+    'tvorba-webu': 'svc_web',
+    'seo': 'svc_seo',
+    'reklama-na-socialnich-sitich': 'svc_ads',
+    'video-a-dron': 'svc_video',
+    'ai-chatbot': 'svc_chatbot',
+    'hosting': 'svc_hosting',
+    'rezervacni-system': 'svc_booking',
+    'sprava-socialnich-siti': 'svc_social',
+    'branding': 'svc_brand',
+    'automatizace-zmeskanych-hovoru': 'svc_calls',
+    'google-firemni-profil': 'svc_google'
+};
+
+/* ==========================================================================
+   Contact page prefill — replaces the old initPricingCards(), which existed
+   only to fill the homepage form that a pricing card scrolled down to. The
+   cards now link to /kontakt.html?balicek=<slug>, so the selection arrives in
+   the URL and is resolved here: hidden field for Formspree, a visible chip so
+   the visitor can see what carried over (and drop it if it was a misclick),
+   and a message the visitor can overwrite.
+   ========================================================================== */
+function initContactPrefill() {
+    const form = document.getElementById('contact-form');
+    if (!form) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const t = translations[currentLang] || translations.cs;
+
+    // A package wins over a service if somebody hand-crafts a URL with both.
+    const sources = [
+        { slug: params.get('balicek'), map: CONTACT_PACKAGES, field: 'form-balicek', msg: 'form_package_msg', label: 'form_chip_package' },
+        { slug: params.get('sluzba'), map: CONTACT_SERVICES, field: 'form-sluzba', msg: 'form_service_msg', label: 'form_chip_service' }
+    ];
+    const hit = sources.find(s => s.slug && s.map[s.slug]);
+    if (!hit) return;
+
+    const name = t[hit.map[hit.slug]];
+    const field = document.getElementById(hit.field);
+    if (!name || !field) return;
+
+    field.value = name;
+
     const messageEl = document.getElementById('contact-msg');
-    if (!cards.length || !packageInput) return;
+    const prefill = (t[hit.msg] || '{name}').replace('{name}', name);
+    // Never overwrite something the visitor already typed — on a bfcache
+    // restore this runs again with the form still filled in.
+    if (messageEl && messageEl.value.trim() === '') messageEl.value = prefill;
 
-    let lastPrefill = '';
-    cards.forEach(card => {
-        card.addEventListener('click', () => {
-            const nameEl = card.querySelector('.pricing-name');
-            const name = nameEl ? nameEl.textContent.trim() : '';
-            packageInput.value = name;
+    const chip = document.getElementById('form-chip');
+    const chipName = document.getElementById('form-chip-name');
+    const chipLabel = document.getElementById('form-chip-label');
+    const chipClear = document.getElementById('form-chip-clear');
+    if (!chip || !chipName) return;
 
-            // Pre-fill the message, but never overwrite what the user typed
-            if (messageEl && (messageEl.value.trim() === '' || messageEl.value === lastPrefill)) {
-                const tpl = translations[currentLang].form_package_msg || 'Mám zájem o balíček {name}.';
-                lastPrefill = tpl.replace('{name}', name);
-                messageEl.value = lastPrefill;
-            }
+    if (chipLabel && t[hit.label]) chipLabel.textContent = t[hit.label];
+    chipName.textContent = name;
+    chip.hidden = false;
+    requestAnimationFrame(() => chip.classList.add('active'));
+
+    if (chipClear) {
+        chipClear.addEventListener('click', () => {
+            field.value = '';
+            chip.classList.remove('active');
+            // Clear the message too, but only if it is still ours untouched.
+            if (messageEl && messageEl.value === prefill) messageEl.value = '';
+            const drop = () => { chip.hidden = true; };
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) drop();
+            else chip.addEventListener('transitionend', drop, { once: true });
+            if (messageEl) messageEl.focus();
         });
+    }
+}
+
+/* ==========================================================================
+   Page transitions — the site already fades IN via .page-loaded; this is the
+   matching fade OUT, so following a link reads as a transition instead of a
+   hard cut. Only same-origin, unmodified, plain left-clicks on real page
+   navigations are intercepted; anchors, mailto/tel, downloads, new tabs and
+   modified clicks all keep native behaviour.
+   ========================================================================== */
+const PAGE_EXIT_MS = 180; // must stay <= the .page-leaving transition in CSS
+
+function initPageTransitions() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    // Coming back via bfcache restores the DOM with .page-leaving still set,
+    // which would leave the page invisible. Always clear it on show.
+    window.addEventListener('pageshow', () => {
+        document.body.classList.remove('page-leaving');
+        document.body.classList.add('page-loaded');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.defaultPrevented || e.button !== 0) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+        const link = e.target.closest('a[href]');
+        if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+        if (link.getAttribute('rel') === 'external') return;
+
+        const url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin) return;
+        if (!/^https?:$/.test(url.protocol)) return; // mailto:, tel:
+
+        // Same document — that's an in-page anchor, leave the scroll alone.
+        if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+
+        e.preventDefault();
+        document.body.classList.add('page-leaving');
+        setTimeout(() => { window.location.href = link.href; }, PAGE_EXIT_MS);
     });
 }
 
