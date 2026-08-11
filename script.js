@@ -99,6 +99,10 @@ const translations = {
         form_service_msg: "Dobrý den, mám zájem o službu {name}.",
         form_chip_package: "Vybraný balíček",
         form_chip_service: "Vybraná služba",
+        faq_tail: "Nenašli jste svou odpověď?",
+        faq_tail_cta: "Zeptejte se nás",
+        footer_contact: "Kontakt",
+        footer_write: "Napsat nám",
         contact_title: "Začněme tvořit",
         contact_subtitle: "Hledáte design, který nekřičí, ale rezonuje?",
         team_label: "Tým",
@@ -233,6 +237,10 @@ const translations = {
         form_service_msg: "Hi, I'm interested in your {name} service.",
         form_chip_package: "Selected package",
         form_chip_service: "Selected service",
+        faq_tail: "Didn't find your answer?",
+        faq_tail_cta: "Ask us",
+        footer_contact: "Contact",
+        footer_write: "Write to us",
         contact_title: "Let's start building",
         contact_subtitle: "Looking for a design that resonates without shouting?",
         team_label: "Team",
@@ -421,6 +429,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initContactForm();
     initContactPrefill();
     initPageTransitions();
+    initFloatingContact();
     initScrollProgress();
     initMagneticButtons();
     initRotatingWords();
@@ -1639,6 +1648,72 @@ function initPageTransitions() {
         e.preventDefault();
         document.body.classList.add('page-leaving');
         setTimeout(() => { window.location.href = link.href; }, PAGE_EXIT_MS);
+    });
+}
+
+/* ==========================================================================
+   Floating contact button — appears once the visitor is past the hero and
+   steps aside again before the contact block, so it never sits on top of the
+   form it duplicates.
+
+   Built here rather than in 24 HTML files on purpose: without JS it would be
+   a fixed button that can never hide, which is worse than no button, and
+   generating it keeps the label and target derived from the page that is
+   actually loaded. It carries data-i18n / data-href-cs so a language switch
+   on the homepage updates it through updateLanguage() like everything else.
+   ========================================================================== */
+const FLOAT_CTA = {
+    showAfter: 1.15, // viewport heights of scroll before it appears
+    arrow: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>'
+};
+
+function initFloatingContact() {
+    // Pointless on the contact page itself.
+    if (/\/(en\/)?kontakt\.html$/.test(window.location.pathname)) return;
+
+    // The block it must not cover: the on-page form, or the footer if a page
+    // ever has no form.
+    const target = document.querySelector('.contact') || document.querySelector('.footer');
+    if (!target) return;
+
+    const cta = document.createElement('a');
+    cta.className = 'float-cta';
+    cta.setAttribute('data-href-cs', '/kontakt.html');
+    cta.setAttribute('data-href-en', '/en/kontakt.html');
+    cta.href = currentLang === 'en' ? '/en/kontakt.html' : '/kontakt.html';
+
+    const label = document.createElement('span');
+    label.setAttribute('data-i18n', 'footer_write');
+    label.textContent = (translations[currentLang] || translations.cs).footer_write;
+    cta.appendChild(label);
+    cta.insertAdjacentHTML('beforeend', FLOAT_CTA.arrow);
+
+    // Starts hidden, and stays out of the tab order and the a11y tree while
+    // it is — an invisible button a keyboard lands on is worse than none.
+    cta.setAttribute('tabindex', '-1');
+    cta.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(cta);
+
+    let hideFrom = Infinity;
+    const measure = () => {
+        hideFrom = target.getBoundingClientRect().top + window.scrollY;
+    };
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    let shown = false;
+    onScroll(({ y, vh }) => {
+        const visible = y > vh * FLOAT_CTA.showAfter && (y + vh) < hideFrom;
+        if (visible === shown) return;
+        shown = visible;
+        cta.classList.toggle('visible', visible);
+        if (visible) {
+            cta.removeAttribute('tabindex');
+            cta.removeAttribute('aria-hidden');
+        } else {
+            cta.setAttribute('tabindex', '-1');
+            cta.setAttribute('aria-hidden', 'true');
+        }
     });
 }
 
