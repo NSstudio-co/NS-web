@@ -85,23 +85,6 @@
     --ease-smooth: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-slow: cubic-bezier(0.16, 1, 0.3, 1);
     --nav-height: 80px;
-
-    /* Scroll-linked hero (M11). --hero-stage is the height of the pinned
-       stage, --hero-pin how many extra stage-heights it stays pinned for:
-       1.5 means progress 0 -> 1 spans 150vh of scrolling. Per-part travel and
-       timing live in HERO_MOTION in script.js. */
-    --hero-stage: 100vh;
-    --hero-pin: 1.5;
-}
-
-/* svh instead of vh so the pinned stage doesn't resize when the mobile URL
-   bar hides — a 100vh stage jumps mid-scroll on iOS. Guarded rather than
-   written as a second declaration: a custom property holding an unknown unit
-   still parses, so the usual two-declaration fallback would not catch it. */
-@supports (height: 1svh) {
-    :root {
-        --hero-stage: 100svh;
-    }
 }
 
 /* ==========================================================================
@@ -792,7 +775,7 @@ ul {
 /* Hero Section */
 .hero {
     position: relative;
-    min-height: var(--hero-stage);
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -811,58 +794,6 @@ ul {
 .hero-container {
     position: relative;
     z-index: 1;
-}
-
-/* ==========================================================================
-   M11 — scroll-linked hero. The hero sticks to the top of its track and the
-   track is one stage taller than the pin distance, so the hero unpins on its
-   own and the next section arrives without anything overlapping. All of it is
-   gated behind .js: with no JavaScript the track has no height of its own and
-   the hero is the plain full-height block it has always been.
-   ========================================================================== */
-.hero-track {
-    position: relative;
-}
-
-.js .hero-track {
-    height: calc(var(--hero-stage) * (1 + var(--hero-pin)));
-}
-
-.js .hero-track .hero {
-    position: sticky;
-    top: 0;
-    /* .hero-glow scales to 1.15, which pushed a 1440px layer out to 1656px and
-       grew the document's scrollWidth. body's overflow-x: hidden clipped it so
-       nothing was visible, but the page should not be getting wider. The glow
-       fades to transparent well before its own edges, so clipping here costs
-       nothing. Safe on the sticky element itself — only an ANCESTOR's overflow
-       would break the pinning. */
-    overflow: hidden;
-}
-
-/* The radial glow is the one thing still on screen when the hero unpins, so
-   it needs to be a real element JS can transform — a ::before can only be
-   reached through a custom property, and writing one on .hero would
-   invalidate the whole hero subtree every frame. Subpages keep ::before. */
-.hero-track .hero::before {
-    content: none;
-}
-
-.hero-glow {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background: radial-gradient(ellipse 55% 45% at 28% 38%, rgba(242, 239, 233, 0.05), transparent 70%);
-}
-
-/* .hero-layer carries the scroll-linked transform only. It has no styles of
-   its own on purpose: it must not create a formatting context, or the margins
-   inside it would stop collapsing and the hero's vertical rhythm would shift.
-   The stats bar is the exception — it was the flex child pushed to the
-   bottom, so its auto margin moves up to the wrapper. */
-.hero .hero-layer[data-hero-layer="stats"] {
-    margin-top: auto;
 }
 
 .eyebrow {
@@ -2289,19 +2220,6 @@ ul {
         padding-bottom: 3rem;
     }
 
-    /* The hero is content-height on phones, so the track can't be a multiple
-       of the stage — it's the hero plus one screen of padding, and that
-       padding is the entire pin distance. JS reads the real heights either
-       way, so shortening the pin here needs no matching change in script.js. */
-    :root {
-        --hero-pin: 1;
-    }
-
-    .js .hero-track {
-        height: auto;
-        padding-bottom: calc(var(--hero-stage) * var(--hero-pin));
-    }
-
     .hero-subtitle {
         margin-bottom: 2rem;
     }
@@ -2348,23 +2266,6 @@ ul {
 
     .section-title {
         font-size: 1.6rem;
-    }
-}
-
-/* Small phones and reduced motion: no pin and no scroll-linked motion at all.
-   The track loses its extra height, the hero goes back to normal flow, and the
-   entrance animation is the whole story — which is what a 390px screen wants
-   anyway. initHeroMotion watches the same two conditions and stops writing,
-   clearing anything it had already set, so no !important is needed here.
-   Placed after the 768px block so it wins over the shortened pin above. */
-@media (max-width: 480px), (prefers-reduced-motion: reduce) {
-    .js .hero-track {
-        height: auto;
-        padding-bottom: 0;
-    }
-
-    .js .hero-track .hero {
-        position: static;
     }
 }
 
@@ -2537,77 +2438,6 @@ ul {
     .footer-links {
         flex-direction: column;
         gap: 2rem;
-    }
-}
-
-/* ==========================================================================
-   M6 — sections stack. Services, pricing and portfolio pin in turn and the
-   next one slides up over the last, which recedes and dims behind it.
-
-   Each pins with a NEGATIVE top, not top: 0, because all three are taller
-   than the viewport (services is 1168px against 900px): pinned at 0, its last
-   268px could never be scrolled to. A top of (viewport - height) pins the
-   section only once its bottom has reached the bottom of the screen, so it is
-   read in full first and only then holds. CSS can't express that — a
-   percentage there resolves against the containing block, not the element —
-   so initSectionStack() writes it per section on load and resize.
-
-   Deliberately a short run of three, ending before the manifest. Stacking
-   everything stops reading as an effect, and the process section already owns
-   a sticky scene of its own (M2) that this must not touch.
-   ========================================================================== */
-.js .stack-section {
-    position: sticky;
-    top: 0; /* replaced per-section by initSectionStack() */
-    z-index: 1;
-    will-change: transform;
-}
-
-/* A section sliding over another has to be opaque or the one behind reads
-   straight through it. .stack-closer is the first section past the run: it
-   does not pin, but it still has to cover the last one that does. */
-.js .stack-section,
-.js .stack-closer {
-    background-color: var(--bg-dark);
-}
-
-.js .stack-closer {
-    position: relative;
-    z-index: 1;
-}
-
-/* The receding section dims behind an overlay's opacity rather than
-   filter: brightness() — a filter on a full-viewport element repaints it
-   every frame, an opacity change stays on the compositor. The veil is a real
-   childless div (added by initSectionStack) so JS writes an inline opacity
-   instead of a custom property, which would invalidate the whole section. */
-.stack-veil {
-    position: absolute;
-    inset: 0;
-    z-index: 3;
-    opacity: 0;
-    pointer-events: none;
-    background: var(--bg-dark);
-}
-
-/* Below 900px and under reduced motion there is no stacking at all: pinning
-   three full sections on a phone is just three screens that refuse to leave.
-   JS watches the same two conditions and stops writing. */
-@media (max-width: 900px), (prefers-reduced-motion: reduce) {
-
-    .js .stack-section {
-        position: static;
-        will-change: auto;
-        transform: none;
-    }
-
-    .js .stack-section,
-    .js .stack-closer {
-        background-color: transparent;
-    }
-
-    .stack-veil {
-        display: none;
     }
 }
 

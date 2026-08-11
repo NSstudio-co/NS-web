@@ -55,7 +55,20 @@ Na webu běží 11 samostatných pohybových systémů:
 
 **Perf po M9 + M10 + M11 + kontaktní stránce**, prokládané A/B proti stavu před M11 (4× CPU throttling, 60× wheel, 3 běhy): **před avg 16.7 ms / 0 framů přes 33 ms — po avg 16.7 ms / 0 framů přes 33 ms.**
 
-### Hotovo (2026-08-11) — M6 (místo M7, po rozhodnutí majitele)
+### ❌ VRÁCENO (2026-08-11) — M6 i M11, rozhodnutí majitele
+
+**Obojí je ze stránky pryč.** Sticky hero (M11) i stackování sekcí (M6) se majiteli nelíbily — „karty", které se na sebe vrství, a chybějící normální scrollování. Kód je odstraněný, `.hero` i jeho CSS jsou bajt po bajtu zpátky ve stavu před M11, jediné sticky prvky na homepage jsou zase jen `.manifest-sticky` (M8) a `.beat-stage` (M2).
+
+Zůstalo: kontaktní stránka a spouštěče, M9 (tlačítka), M10 (grain), a oprava `initContactForm()`, která si mazala šipku z tlačítka. Ty se scrollu netýkají.
+
+**Poučení pro další fáze — plán počítá s jiným webem, než jaký existuje.** Dvakrát po sobě:
+
+- **M7** předpokládá mřížku log. Sekce Dovednosti jsou karty s odstavci textu.
+- **M6** předpokládá sekce vysoké jako obrazovka. Osm z deseti je vyšších, takže `top: 0` by schoval spodky sekcí a muselo se to obcházet záporným `top`.
+
+Když se efekt musí takhle ohýbat, aby vůbec šel udělat, je to signál, že na tenhle web nepatří — ne že se má ohnout víc. **Před dalším motion úkolem si nejdřív ověřit předpoklady proti skutečnému markupu a rozměrům, teprve pak psát kód.** Popis obou efektů níž zůstává jako záznam, co se zkoušelo a proč to nevyšlo.
+
+#### Co se u M6 zjistilo (pro případ, že by se k tomu někdo vracel)
 
 - **Stackují se tři sekce: Služby → Balíčky → Portfolio**, closer je Manifest. Krátký běh záměrně: kdyby se stackovalo všechno, přestane to být efekt. Proces (M2) a jeho sticky scéna zůstávají nedotčené.
 - **Připíchnutí je na ZÁPORNÉM `top`, ne `top: 0`.** Všechny tři sekce jsou vyšší než viewport (Služby 1168 px proti 900 px) — při `top: 0` by se posledních 268 px nedalo nikdy zobrazit, což je ztráta obsahu, ne animace. `top = (viewport − výška)` sekci připíchne až ve chvíli, kdy její spodek dojede na spodek obrazovky, takže se nejdřív celá přečte. CSS to neumí (procento se počítá z containing blocku, ne z elementu), takže to per sekci píše `initSectionStack()` při initu a resize. **Ověřeno: spodek všech tří sekcí je dosažitelný** (877 / 874 / 874 px při viewportu 900).
@@ -69,7 +82,7 @@ Na webu běží 11 samostatných pohybových systémů:
 
 Plán počítá se „statickou mřížkou log". Sekce Dovednosti ale žádná loga nemá — je to 6 karet, každá ikona + `<h4>` + odstavec popisu s `data-i18n`. Udělat z nich dva jedoucí pásy znamená ten popisný text buď smazat, nebo ho nechat vodorovně ujíždět, což je nečitelné. Obojí je ztráta obsahu, ne animace. Pokud se k M7 vrátíme, chce to **samostatný pás se skutečnými logy technologií** (self-hosted SVG — Devicon CDN je podle `AGENTS.md` pryč) nad nebo pod stávající mřížkou, ne přestavbu karet.
 
-### Hotovo (2026-08-11) — M11 (nad rámec původního plánu)
+#### Co se u M11 zjistilo (vráceno, viz výš)
 
 - **Hero je připíchnutý a jeho části odcházejí po vlastních úsecích scrollu.** `.hero-track` je o jednu scénu vyšší než pin, takže se hero odepne samo a další sekce nastupuje bez překryvu — žádné `z-index` ani neprůhledné pozadí na `.services` nebylo potřeba. Změřeno: track 2250 px, scéna 900 px, pin **1350 px = přesně 150vh**, `heroTop=0` drží po celé p=0→1.
 - **Klíčový detail: `.hero-layer` wrappery.** Vstupní animace (`.hero-fade`, `.word-mask`) drží transform na samotných elementech, a to **přes 0.8s transition**. Zápis scroll offsetu na tentýž element by vstupní animaci přepsal a zároveň protáhl každý scroll frame tím easingem. Wrapper drží scroll transform, vnitřek si nechá vstup. Wrappery nemají **žádné vlastní styly** — jinak by uvnitř přestaly kolabovat marginy a posunula by se vertikální rytmika hera.
