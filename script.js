@@ -418,6 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initMagneticButtons();
     initRotatingWords();
     initHeroReveal();
+    initHeroMotion();
     initPortfolioParallax();
     initStatsCounter();
     initScrollSpy();
@@ -820,6 +821,195 @@ function initHeroReveal() {
     } else {
         startOnce();
     }
+}
+
+/* ==========================================================================
+   Hero motion (M11) — the hero is pinned for a fixed scroll distance and its
+   parts leave on their own sub-ranges of that distance, instead of the page
+   simply scrolling past it.
+
+   Driven by scroll position, not by time: every value below is a pure
+   function of scrollY, so scrubbing backwards is exact and there is no
+   in-flight animation to fall behind the finger. It registers into the M0
+   scroll loop rather than adding a listener of its own — that rule is what
+   keeps the page at 60fps with eight scroll effects on it. Native
+   `animation-timeline: view()` would be the other option, but the entrance
+   animation already owns a CSS transition on these elements, and a second
+   timeline on the same transform property would have to fight it.
+
+   Everything tunable is in HERO_MOTION; the pin distance and the stage height
+   are --hero-pin / --hero-stage in style.css.
+   ========================================================================== */
+const HERO_MOTION = {
+    /* Each entry is one .hero-layer. `from`/`to` are the slice of the pin the
+       layer animates over, `shift` how far it travels in px, `fade` how much
+       opacity it gives up. `guard` marks the layers that hold links: once
+       they're invisible they also leave the tab order, so a keyboard user
+       never lands on a control they cannot see. */
+    layers: [
+        { name: 'head', from: 0.00, to: 0.50, shift: -60, fade: 1 },
+        { name: 'sub', from: 0.10, to: 0.60, shift: -60, fade: 1 },
+        { name: 'cta', from: 0.70, to: 1.00, shift: -40, fade: 1, guard: true },
+        { name: 'cue', from: 0.00, to: 0.18, shift: -20, fade: 1, guard: true },
+        { name: 'stats', from: 0.55, to: 0.90, shift: -30, fade: 1 }
+    ],
+    /* The glow runs the whole range — it's the only thing left on screen when
+       the hero unpins, so it carries the handover to the next section. */
+    glow: { scale: 0.15, rise: -8, dim: 0.6 },
+    /* 481-768px: same choreography, but no glow parallax and a short travel
+       that a thumb-flick can't overshoot. */
+    softShift: -24,
+    /* In-out sine. Deliberately NOT --ease-slow (the expo-out this site uses
+       everywhere else): expo-out is a curve for motion that plays over time,
+       and scrubbing it spends almost all of its travel in the first tenth of
+       the input. Measured with --ease-slow here, the headline's 0 -> 0.5 range
+       was at opacity 0.25 by p=0.10 and 0.03 by p=0.25 — 97% gone 338px into a
+       1350px pin, which reads as a teleport and leaves the rest of the pin
+       empty. A symmetric curve tracks the wheel instead. For the expo-out
+       version put [0.16, 1, 0.3, 1] back here. */
+    ease: [0.33, 0, 0.67, 1]
+};
+
+/* CSS easing curves can't be read from JS, so solve the same cubic-bezier
+   here: Newton-Raphson for t at a given x, then evaluate y. Five iterations
+   is well past visually exact for these curves. */
+function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+
+    const atX = t => ((ax * t + bx) * t + cx) * t;
+    const slopeX = t => (3 * ax * t + 2 * bx) * t + cx;
+    const atY = t => ((ay * t + by) * t + cy) * t;
+
+    return (x) => {
+        if (x <= 0) return 0;
+        if (x >= 1) return 1;
+        let t = x;
+        for (let i = 0; i < 5; i++) {
+            const d = slopeX(t);
+            if (Math.abs(d) < 1e-6) break;
+            t -= (atX(t) - x) / d;
+        }
+        return atY(t);
+    };
+}
+
+function initHeroMotion() {
+    const track = document.querySelector('.hero-track');
+    const hero = track && track.querySelector('.hero');
+    if (!track || !hero) return;
+
+    const layers = HERO_MOTION.layers
+        .map(spec => {
+            const el = hero.querySelector(`.hero-layer[data-hero-layer="${spec.name}"]`);
+            return el ? { ...spec, el, hidden: false } : null;
+        })
+        .filter(Boolean);
+    if (!layers.length) return;
+
+    const glow = hero.querySelector('.hero-glow');
+    const ease = cubicBezier(...HERO_MOTION.ease);
+
+    // Small phones and reduced motion get no scroll-linked motion at all; the
+    // CSS unpins the track for exactly these two conditions.
+    const flat = window.matchMedia('(max-width: 480px), (prefers-reduced-motion: reduce)');
+    const soft = window.matchMedia('(max-width: 768px)');
+
+    let trackTop = 0;
+    let travel = 1;
+    let lastP = -1;
+    let lifted = false;
+
+    // Both reads happen here and on resize, never in the scroll path. travel
+    // is the distance the hero stays pinned: the track minus the stage. It's
+    // measured rather than derived from --hero-pin because the hero is
+    // content-height below 768px, where the two don't match.
+    const measure = () => {
+        trackTop = track.getBoundingClientRect().top + window.scrollY;
+        travel = Math.max(1, track.offsetHeight - hero.offsetHeight);
+    };
+
+    // will-change only while the hero is actually mid-pin — left on, it holds
+    // a compositor layer per element for the whole of the rest of the page.
+    const lift = (on) => {
+        if (on === lifted) return;
+        lifted = on;
+        const value = on ? 'transform, opacity' : '';
+        layers.forEach(l => { l.el.style.willChange = value; });
+        if (glow) glow.style.willChange = value;
+    };
+
+    const clear = () => {
+        layers.forEach(l => {
+            l.el.style.transform = '';
+            l.el.style.opacity = '';
+            l.el.style.visibility = '';
+            l.hidden = false;
+        });
+        if (glow) {
+            glow.style.transform = '';
+            glow.style.opacity = '';
+        }
+        lift(false);
+        lastP = -1;
+    };
+
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    onScroll(({ y }) => {
+        if (flat.matches) return;
+
+        const p = Math.max(0, Math.min((y - trackTop) / travel, 1));
+        // Above and below the hero p is pinned at 0 / 1. Writing the same
+        // value again still costs a style recalc on every layer, every frame —
+        // this guard is what keeps the rest of the page free of the hero.
+        if (p === lastP) return;
+        lastP = p;
+
+        lift(p > 0 && p < 1);
+        const gentle = soft.matches;
+
+        for (let i = 0; i < layers.length; i++) {
+            const l = layers[i];
+            const e = ease(Math.max(0, Math.min((p - l.from) / (l.to - l.from), 1)));
+            const shift = gentle ? HERO_MOTION.softShift : l.shift;
+
+            l.el.style.transform = `translate3d(0, ${(shift * e).toFixed(2)}px, 0)`;
+            l.el.style.opacity = (1 - e * l.fade).toFixed(3);
+
+            const gone = l.guard && e >= 1 && l.fade >= 1;
+            if (gone !== l.hidden) {
+                l.hidden = gone;
+                l.el.style.visibility = gone ? 'hidden' : '';
+            }
+        }
+
+        if (glow) {
+            const g = gentle ? 0 : ease(p);
+            glow.style.transform =
+                `translate3d(0, ${(g * HERO_MOTION.glow.rise).toFixed(2)}%, 0) scale(${(1 + g * HERO_MOTION.glow.scale).toFixed(4)})`;
+            glow.style.opacity = (1 - g * HERO_MOTION.glow.dim).toFixed(3);
+        }
+    });
+
+    const sync = () => {
+        if (flat.matches) {
+            clear();
+            return;
+        }
+        measure();
+        lastP = -1; // the pin distance just changed — force a rewrite
+        requestScrollFrame();
+    };
+
+    flat.addEventListener('change', sync);
+    soft.addEventListener('change', sync);
+    sync();
 }
 
 /* ==========================================================================
