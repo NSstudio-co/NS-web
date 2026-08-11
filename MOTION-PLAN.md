@@ -55,6 +55,19 @@ Na webu běží 11 samostatných pohybových systémů:
 
 **Perf po M9 + M10 + M11 + kontaktní stránce**, prokládané A/B proti stavu před M11 (4× CPU throttling, 60× wheel, 3 běhy): **před avg 16.7 ms / 0 framů přes 33 ms — po avg 16.7 ms / 0 framů přes 33 ms.**
 
+### Hotovo (2026-08-11) — hero se hýbe, ale nic se nepřipíchne
+
+Po revertu M11 si majitel vyžádal, ať horní část zůstane animovaná — **ale bez připíchnutí**. To je ten správný závěr z celé té zápletky: vadilo zastavení stránky, ne pohyb.
+
+- **Žádný sticky, žádný track.** Hero je pořád `position: relative` a odscrolluje normálně. Progress je prostě `scrollY / výška hera` — 0 nahoře, 1 když hero projede. Stránka se nikde nezastaví.
+- **Vrstvy `.hero-layer` se vrátily** (z commitu `d54b6f6`, bez `.hero-track`). Pořád platí důvod, proč existují: vstupní animace drží transform na samotných elementech přes 0.8s transition, takže zápis scroll offsetu na tentýž element by ji přepsal a zároveň protáhl každý frame tím easingem.
+- **Choreografie překryvem, ne po sobě:** nadpis 0–0.55, podnadpis 0.08–0.62, tlačítka 0.16–0.70, stats 0.30–0.80, šipka dolů 0–0.16 (odejde hned, jakmile začneš scrollovat). Naměřeno na p=0.30: nadpis 0.43, podnadpis 0.64, tlačítka 0.83, stats 1.00 — postupné, ne skokové.
+- Posuny jsou **záporné** (obsah se zvedá rychleji než stránka), takže nemůže přetéct do další sekce.
+- Easing pořád in-out sine `[0.33, 0, 0.67, 1]`, ne `--ease-slow` — důvod viz níž u M11.
+- `.hero` má `overflow: hidden` kvůli škálujícímu glow (jinak roste `scrollWidth` dokumentu, viz oprava u M6).
+- **Pod 480 px a při reduced motion** se nezapisuje vůbec; 481–768 px má kratší posun (−22 px). Bez JS beze změny.
+- Perf: prokládané A/B proti stavu před M11 — **avg 16,7 ms / 0 framů přes 33 ms** na obou stranách. Mimo hero nula zápisů, `will-change` zpátky na `auto`.
+
 ### Hotovo (2026-08-11) — M4 ⭐ + čísla sekcí pryč
 
 **Čísla sekcí `(01)`–`(07)` zrušená** (rozhodnutí majitele) — 95 výskytů ve 23 souborech, plus pravidlo `.section-num`. Odstavec v `AGENTS.md`, který je předepisoval, je přeškrtnutý a označený jako neplatný, jinak je příští session vrátí zpátky.

@@ -436,6 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initMagneticButtons();
     initRotatingWords();
     initHeroReveal();
+    initHeroMotion();
     initPortfolioParallax();
     initPortfolioScroll();
     initBrowserUrl();
@@ -947,6 +948,171 @@ function initHeroReveal() {
     } else {
         startOnce();
     }
+}
+
+/* ==========================================================================
+   Hero motion — the hero's parts leave on their own slices of its scroll-away.
+   Nothing is pinned: progress is simply how far the hero has scrolled past,
+   0 at the top of the page and 1 once its full height has gone by. The page
+   never stops, which is the whole point — the pinned version was tried and
+   pulled because holding the page still is what felt wrong.
+
+   Driven by scroll position, not time, so scrubbing back is exact.
+
+   Each moving group is a .hero-layer wrapper. The entrance animation
+   (.hero-fade, .word-mask) already owns the transform on the elements
+   themselves and runs on a 0.8s CSS transition — writing the scroll offset to
+   the same element would both clobber the entrance and drag every scroll frame
+   through that easing. Separate elements, so neither has to know about the
+   other.
+   ========================================================================== */
+const HERO_MOTION = {
+    /* `from`/`to` are the slice of the scroll-away each layer animates over,
+       `shift` how far it travels in px (negative = lifts away faster than the
+       page), `fade` how much opacity it gives up. `guard` marks the layers
+       holding links: once invisible they leave the tab order too. */
+    layers: [
+        { name: 'head', from: 0.00, to: 0.55, shift: -70, fade: 1 },
+        { name: 'sub', from: 0.08, to: 0.62, shift: -55, fade: 1 },
+        { name: 'cta', from: 0.16, to: 0.70, shift: -40, fade: 1, guard: true },
+        { name: 'cue', from: 0.00, to: 0.16, shift: -18, fade: 1, guard: true },
+        { name: 'stats', from: 0.30, to: 0.80, shift: -26, fade: 1 }
+    ],
+    glow: { scale: 0.12, rise: -6, dim: 0.55 },
+    softShift: -22, // 481-768px: same choreography, shorter travel
+    /* In-out sine, deliberately NOT --ease-slow. Expo-out is a curve for
+       motion that plays over time; scrubbed, it spends almost all its travel
+       in the first tenth of the input, which reads as a teleport. */
+    ease: [0.33, 0, 0.67, 1]
+};
+
+/* CSS easing curves can't be read from JS, so solve the same cubic-bezier
+   here: Newton-Raphson for t at a given x, then evaluate y. */
+function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+
+    const atX = t => ((ax * t + bx) * t + cx) * t;
+    const slopeX = t => (3 * ax * t + 2 * bx) * t + cx;
+    const atY = t => ((ay * t + by) * t + cy) * t;
+
+    return (x) => {
+        if (x <= 0) return 0;
+        if (x >= 1) return 1;
+        let t = x;
+        for (let i = 0; i < 5; i++) {
+            const d = slopeX(t);
+            if (Math.abs(d) < 1e-6) break;
+            t -= (atX(t) - x) / d;
+        }
+        return atY(t);
+    };
+}
+
+function initHeroMotion() {
+    const hero = document.querySelector('.hero#hero');
+    if (!hero) return;
+
+    const layers = HERO_MOTION.layers
+        .map(spec => {
+            const el = hero.querySelector(`.hero-layer[data-hero-layer="${spec.name}"]`);
+            return el ? { ...spec, el, hidden: false } : null;
+        })
+        .filter(Boolean);
+    if (!layers.length) return;
+
+    const glow = hero.querySelector('.hero-glow');
+    const ease = cubicBezier(...HERO_MOTION.ease);
+
+    const flat = window.matchMedia('(max-width: 480px), (prefers-reduced-motion: reduce)');
+    const soft = window.matchMedia('(max-width: 768px)');
+
+    let travel = 1;
+    let lastP = -1;
+    let lifted = false;
+
+    // One read, here and on resize — never in the scroll path. The hero starts
+    // at the top of the page, so its own height is the whole travel.
+    const measure = () => { travel = Math.max(1, hero.offsetHeight); };
+
+    // will-change only while the hero is actually on its way out; left on, it
+    // holds a compositor layer per element for the rest of the page.
+    const lift = (on) => {
+        if (on === lifted) return;
+        lifted = on;
+        const value = on ? 'transform, opacity' : '';
+        layers.forEach(l => { l.el.style.willChange = value; });
+        if (glow) glow.style.willChange = value;
+    };
+
+    const clear = () => {
+        layers.forEach(l => {
+            l.el.style.transform = '';
+            l.el.style.opacity = '';
+            l.el.style.visibility = '';
+            l.hidden = false;
+        });
+        if (glow) {
+            glow.style.transform = '';
+            glow.style.opacity = '';
+        }
+        lift(false);
+        lastP = -1;
+    };
+
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    onScroll(({ y }) => {
+        if (flat.matches) return;
+
+        const p = Math.max(0, Math.min(y / travel, 1));
+        // Below the hero p is pinned at 1. Rewriting the same value still costs
+        // a style recalc on every layer, every frame.
+        if (p === lastP) return;
+        lastP = p;
+
+        lift(p > 0 && p < 1);
+        const gentle = soft.matches;
+
+        for (let i = 0; i < layers.length; i++) {
+            const l = layers[i];
+            const e = ease(Math.max(0, Math.min((p - l.from) / (l.to - l.from), 1)));
+            const shift = gentle ? HERO_MOTION.softShift : l.shift;
+
+            l.el.style.transform = `translate3d(0, ${(shift * e).toFixed(2)}px, 0)`;
+            l.el.style.opacity = (1 - e * l.fade).toFixed(3);
+
+            // Fully faded text is still in the tab order — take it out so a
+            // keyboard user never lands on an invisible link.
+            const gone = l.guard && e >= 1 && l.fade >= 1;
+            if (gone !== l.hidden) {
+                l.hidden = gone;
+                l.el.style.visibility = gone ? 'hidden' : '';
+            }
+        }
+
+        if (glow) {
+            const g = gentle ? 0 : ease(p);
+            glow.style.transform =
+                `translate3d(0, ${(g * HERO_MOTION.glow.rise).toFixed(2)}%, 0) scale(${(1 + g * HERO_MOTION.glow.scale).toFixed(4)})`;
+            glow.style.opacity = (1 - g * HERO_MOTION.glow.dim).toFixed(3);
+        }
+    });
+
+    const sync = () => {
+        if (flat.matches) { clear(); return; }
+        measure();
+        lastP = -1;
+        requestScrollFrame();
+    };
+    flat.addEventListener('change', sync);
+    soft.addEventListener('change', sync);
+    sync();
 }
 
 /* ==========================================================================
