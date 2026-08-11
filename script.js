@@ -437,6 +437,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initRotatingWords();
     initHeroReveal();
     initPortfolioParallax();
+    initPortfolioScroll();
+    initBrowserUrl();
     initStatsCounter();
     initScrollSpy();
     initBackgroundParallax();
@@ -702,19 +704,122 @@ function resplitLineReveals() {
    Portfolio parallax (A5) — nudges each mockup image ±12px against scroll
    position. Subtle on purpose; skipped entirely for reduced motion.
    ========================================================================== */
+const PORTFOLIO_MOTION = {
+    imgShift: -12, // the existing drift of the shot inside its frame
+    cardDrift: 26, // M4/D — how far the two columns slide past each other
+    speed: 240     // px of page travel per second on hover
+};
+
 function initPortfolioParallax() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    const wraps = document.querySelectorAll('.portfolio-img-wrap');
-    if (!wraps.length) return;
+    // One rect per card, not one per moving element: the drift wrapper and the
+    // image wrap are both inside the item, and the item itself is never
+    // transformed here, so its rect is a stable reference for both. Reading
+    // the children instead would be measuring something we just moved.
+    const items = Array.from(document.querySelectorAll('.portfolio-item')).map((el, i) => ({
+        el,
+        wrap: el.querySelector('.portfolio-img-wrap'),
+        drift: el.querySelector('.portfolio-drift'),
+        // Cards alternate columns, so odd ones travel against the even ones.
+        dir: i % 2 === 0 ? -1 : 1
+    })).filter(it => it.wrap || it.drift);
+    if (!items.length) return;
 
     onScroll(({ vh }) => {
-        wraps.forEach(wrap => {
-            const rect = wrap.getBoundingClientRect();
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            const rect = it.el.getBoundingClientRect();
             const center = rect.top + rect.height / 2;
             const progress = Math.max(-1, Math.min(1, (center - vh / 2) / (vh / 2)));
-            wrap.style.transform = `translateY(${progress * -12}px)`;
+            if (it.wrap) it.wrap.style.transform = `translateY(${(progress * PORTFOLIO_MOTION.imgShift).toFixed(1)}px)`;
+            if (it.drift) it.drift.style.transform = `translateY(${(progress * PORTFOLIO_MOTION.cardDrift * it.dir).toFixed(1)}px)`;
+        }
+    });
+}
+
+/* ==========================================================================
+   M4 — the mockup scrolls itself on hover. The <img> is now the whole page,
+   overflowing the 16/10 window, and the hover state slides it to its end.
+
+   Travel and forward duration are written per card as custom properties
+   rather than fixed in CSS: distance depends on the screenshot's real height,
+   and a fixed duration would make a short site sprint and a long one crawl.
+   The return is the CSS default (0.9s eased) — forward and back having
+   different lengths is what makes it read as playback, not a state swap.
+   ========================================================================== */
+function initPortfolioScroll() {
+    const items = document.querySelectorAll('.portfolio-item');
+    if (!items.length) return;
+
+    const measure = () => {
+        items.forEach(item => {
+            const win = item.querySelector('.browser-content');
+            const page = item.querySelector('.portfolio-page');
+            if (!win || !page) return;
+            const travel = Math.max(0, page.offsetHeight - win.clientHeight);
+            item.style.setProperty('--page-travel', `${-Math.round(travel)}px`);
+            item.style.setProperty('--page-duration', `${(travel / PORTFOLIO_MOTION.speed).toFixed(2)}s`);
         });
+    };
+
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    // The shots are loading="lazy", so their height is 0 until they arrive.
+    items.forEach(item => {
+        const img = item.querySelector('.portfolio-reveal-img');
+        if (img && !img.complete) img.addEventListener('load', measure, { once: true });
+    });
+}
+
+/* ==========================================================================
+   M4 — the address bar. The URL sits there dimmed at rest so the frame reads
+   as a browser rather than a decoration; on hover it retypes itself.
+
+   Only forward: leaving snaps the full address back instead of erasing it,
+   so sweeping the pointer across the grid doesn't set off four rewinds.
+   ========================================================================== */
+const URL_TYPE_MS = 18; // per character
+
+function initBrowserUrl() {
+    const items = document.querySelectorAll('.portfolio-item[data-url]');
+    if (!items.length) return;
+
+    const still = window.matchMedia('(prefers-reduced-motion: reduce), (hover: none), (pointer: coarse)');
+
+    items.forEach(item => {
+        const bar = item.querySelector('.browser-url');
+        if (!bar) return;
+        // The address is already in the markup so a no-JS visit shows it too;
+        // this only animates it.
+        const url = item.dataset.url;
+        if (still.matches) return;
+
+        let timer = null;
+        const stop = () => {
+            if (timer) clearInterval(timer);
+            timer = null;
+            bar.classList.remove('typing');
+        };
+
+        const type = () => {
+            stop();
+            bar.classList.add('typing');
+            bar.textContent = '';
+            let i = 0;
+            timer = setInterval(() => {
+                bar.textContent = url.slice(0, ++i);
+                if (i >= url.length) stop();
+            }, URL_TYPE_MS);
+        };
+
+        const reset = () => { stop(); bar.textContent = url; };
+
+        item.addEventListener('mouseenter', type);
+        item.addEventListener('focus', type);
+        item.addEventListener('mouseleave', reset);
+        item.addEventListener('blur', reset);
     });
 }
 
@@ -897,34 +1002,48 @@ function initGrainVelocity() {
    ========================================================================== */
 const BUTTON_LABEL_SELECTOR = '.btn, .pricing-cta, .form-submit';
 
+/* Turns an element's own text into a mask + mover pair. `alt` is the line that
+   rolls in from below — the same words for a button, the project's address for
+   a portfolio card. */
+function rollLabel(host, alt) {
+    if (!host || host.querySelector(':scope > .btn-label')) return; // already wrapped
+
+    // Text nodes only: an <svg> stays exactly where it was in the flow.
+    const nodes = Array.from(host.childNodes)
+        .filter(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+    if (!nodes.length) return;
+
+    const text = nodes.map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+    if (!text) return;
+
+    const mask = document.createElement('span');
+    mask.className = 'btn-label';
+    // Only when the two lines differ: the mask is sized by `text`, so CSS
+    // needs the other string to widen it or the longer line gets clipped.
+    if (alt && alt !== text) mask.setAttribute('data-alt', alt);
+    const inner = document.createElement('span');
+    inner.className = 'btn-label-in';
+    inner.setAttribute('data-label', alt || text);
+    inner.textContent = text;
+    mask.appendChild(inner);
+
+    host.insertBefore(mask, nodes[0]);
+    nodes.forEach(n => n.remove());
+}
+
 function wrapButtonLabels() {
     document.querySelectorAll(BUTTON_LABEL_SELECTOR).forEach(el => {
         // The words may sit in a child span (next to an icon) or directly in
         // the button. An icon-only span has no text and must not be picked.
-        let host = Array.from(el.children)
+        const host = Array.from(el.children)
             .find(c => c.tagName === 'SPAN' && c.textContent.trim());
-        if (!host) host = el;
+        rollLabel(host || el);
+    });
 
-        if (host.querySelector(':scope > .btn-label')) return; // already wrapped
-
-        // Text nodes only: an <svg> stays exactly where it was in the flow.
-        const nodes = Array.from(host.childNodes)
-            .filter(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
-        if (!nodes.length) return;
-
-        const text = nodes.map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
-        if (!text) return;
-
-        const mask = document.createElement('span');
-        mask.className = 'btn-label';
-        const inner = document.createElement('span');
-        inner.className = 'btn-label-in';
-        inner.setAttribute('data-label', text);
-        inner.textContent = text;
-        mask.appendChild(inner);
-
-        host.insertBefore(mask, nodes[0]);
-        nodes.forEach(n => n.remove());
+    // Same machinery on the portfolio, but the second line is the project's
+    // address rather than a copy of the name.
+    document.querySelectorAll('.portfolio-item[data-url] .portfolio-name').forEach(name => {
+        rollLabel(name, name.closest('[data-url]').dataset.url);
     });
 }
 

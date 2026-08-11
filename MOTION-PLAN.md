@@ -55,6 +55,24 @@ Na webu běží 11 samostatných pohybových systémů:
 
 **Perf po M9 + M10 + M11 + kontaktní stránce**, prokládané A/B proti stavu před M11 (4× CPU throttling, 60× wheel, 3 běhy): **před avg 16.7 ms / 0 framů přes 33 ms — po avg 16.7 ms / 0 framů přes 33 ms.**
 
+### Hotovo (2026-08-11) — M4 ⭐ + čísla sekcí pryč
+
+**Čísla sekcí `(01)`–`(07)` zrušená** (rozhodnutí majitele) — 95 výskytů ve 23 souborech, plus pravidlo `.section-num`. Odstavec v `AGENTS.md`, který je předepisoval, je přeškrtnutý a označený jako neplatný, jinak je příští session vrátí zpátky.
+
+**M4 — mockup se sám prochází.** Odblokováno tím, že jsem si full-page screenshoty **nasnímal sám** headless prohlížečem ze čtyř živých adres (1280 px viewport, `reducedMotion` ať jsou vstupní animace dojeté, projití celé stránky kvůli lazy obrázkům), pak zmenšil na 1024 px a uložil jako WebP q72. **490 kB celkem** — těsně pod stropem 500 kB z plánu.
+
+- **Vrstvení:** `.portfolio-drift` (scroll drift) → `.browser-frame` → `.portfolio-img-wrap` (parallax + clip reveal) → `.portfolio-page` (odjezd při hoveru) → `img`. Každá vrstva má právě jeden transform. Bez toho by se vstupní `.blur-reveal` na `.portfolio-item` a scroll drift přepisovaly navzájem — stejný problém jako u heru.
+- **Reveal se přesunul z `<img>` na `.portfolio-img-wrap`.** Obrázek je teď celá stránka (4293 px u Phera) a `clip-path` hnaný přes *tuhle* výšku by viditelné okno 16/10 odkryl v prvních pár procentech — reveal by vypadal jako skok.
+- **Vzdálenost i doba odjezdu jsou per karta**, zapsané jako custom properties z `initPortfolioScroll()`: Phero −1791 px / 7,5 s, AtomiQ −966 px / 4,0 s, Docs Writer −1587 px / 6,6 s, PromptForge −2314 px / 9,6 s. Pevná doba by krátký web hnala a dlouhý plazila. **Návrat je 0,9 s eased** — rozdílná délka dopředu a zpátky je to, proč to působí jako přehrávání, ne jako přepnutí stavu.
+- **Overlay → štítek v rohu.** Původní overlay rozmazával celý mockup právě ve chvíli, kdy se pod ním stránka roluje.
+- **Adresní řádek** je v markupu (ne z JS), na hover se přepíše znak po znaku a zesvětlí. Odchod ho vrátí skokem, ne přetáčením — jinak přejetí myší přes mřížku spustí čtyři rewindy.
+- **Název projektu roluje na adresu** — recyklovaná mechanika M9 (`rollLabel()` zobecněný o druhý řádek). Maska je široká podle názvu, takže delší adresa se ořezávala („pherobistro." místo celé) — dorovnává to nulová skrytá rozpěrka, scopnutá na `(hover: hover)`, ať na dotyku nemačká kategorii vedle.
+- **D — sloupce se míjejí:** `.portfolio-drift` ±26 px proti sobě. Jedno čtení rozměrů na kartu, ne na každý pohyblivý prvek — karta sama se netransformuje, takže je stabilní referencí pro obojí.
+
+**Opraven zděděný bug:** `clip-path` reveal nebyl podmíněný `.js`, takže **bez JavaScriptu byly všechny čtyři náhledy neviditelné** (`.active` nikdy nepřibylo). Teď je gated a bez JS se ukáže horní výřez skutečné stránky.
+
+**Perf:** prokládané A/B proti stavu před M11, 4× CPU throttling — před avg 16,7 ms / 0 framů přes 33 ms, po **avg 16,7 ms / 0 framů přes 33 ms**.
+
 ### ❌ VRÁCENO (2026-08-11) — M6 i M11, rozhodnutí majitele
 
 **Obojí je ze stránky pryč.** Sticky hero (M11) i stackování sekcí (M6) se majiteli nelíbily — „karty", které se na sebe vrství, a chybějící normální scrollování. Kód je odstraněný, `.hero` i jeho CSS jsou bajt po bajtu zpátky ve stavu před M11, jediné sticky prvky na homepage jsou zase jen `.manifest-sticky` (M8) a `.beat-stage` (M2).

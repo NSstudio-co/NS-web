@@ -1176,6 +1176,7 @@ ul {
 .browser-header {
     padding: 0.75rem 1rem;
     display: flex;
+    align-items: center;
     gap: 0.4rem;
     border-bottom: 1px solid var(--card-border);
     background: rgba(242, 239, 233, 0.015);
@@ -1198,29 +1199,72 @@ ul {
     width: 100%;
     height: 100%;
     will-change: transform;
+    /* The entrance reveal moved here off the <img>. The image is now the whole
+       page (4293px for Phero), and a clip-path swept across THAT height would
+       clear the visible 16/10 window in the first few percent — the reveal
+       would read as instant. On the wrap it sweeps the frame, as before. */
+}
+
+/* Gated behind .js — and it always should have been. The old rule put this
+   clip-path on the <img> ungated, so with JavaScript off nothing ever added
+   .active and every portfolio shot stayed clipped to zero height: four empty
+   browser frames. Inherited bug, fixed here. */
+.js .portfolio-img-wrap {
+    clip-path: inset(0 0 100% 0);
+    transition: clip-path 0.9s var(--ease-slow);
+}
+
+.js .portfolio-item.active .portfolio-img-wrap {
+    clip-path: inset(0 0 0 0);
+}
+
+/* M4 — the page inside the frame. height: auto is the whole trick: the
+   screenshot keeps its real proportions and overflows the 16/10 window, and
+   that overflow is what scrolls on hover. */
+.portfolio-page {
+    width: 100%;
+    transform: translateY(0);
+    /* the RETURN transition — short and eased */
+    transition: transform 0.9s var(--ease-slow);
 }
 
 .browser-content img {
     display: block;
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    clip-path: inset(0 0 100% 0);
-    transform: scale(1.12);
-    transition: clip-path 0.9s var(--ease-slow), transform 0.9s var(--ease-slow);
+    height: auto;
 }
 
-.portfolio-item.active .browser-content img {
-    clip-path: inset(0 0 0 0);
-    transform: scale(1.06);
+/* Forward and back are deliberately different lengths: that is what makes it
+   read as playback rather than a state swap. Travel and forward duration are
+   per image — a short site would sprint and a long one crawl on a fixed
+   duration — so initPortfolioScroll() writes both as custom properties. */
+.js .portfolio-item:hover .portfolio-page,
+.js .portfolio-item:focus-visible .portfolio-page {
+    transform: translateY(var(--page-travel, 0px));
+    transition-duration: var(--page-duration, 4s);
+    transition-timing-function: linear;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .browser-content img {
+    .js .portfolio-img-wrap {
         clip-path: inset(0);
+        transition: none;
+    }
+
+    .js .portfolio-page,
+    .js .portfolio-item:hover .portfolio-page,
+    .js .portfolio-item:focus-visible .portfolio-page {
         transform: none;
         transition: none;
+    }
+}
+
+/* No hover to run it, so the page stays at the top crop, as it always was. */
+@media (hover: none), (pointer: coarse) {
+
+    .js .portfolio-item:hover .portfolio-page,
+    .js .portfolio-item:focus-visible .portfolio-page {
+        transform: none;
     }
 }
 
@@ -1263,62 +1307,140 @@ ul {
     color: var(--text-primary);
 }
 
-/* Hover overlay with an explicit "open" button — makes it unmistakable that
-   the mockup is clickable, on top of the caption arrow below it. */
-.portfolio-overlay {
+/* A corner chip, not the old full-cover overlay. That overlay blurred the
+   whole mockup on hover — which is exactly when the page is now scrolling
+   underneath it, so it would have hidden the effect it sits on top of. */
+.portfolio-chip {
     position: absolute;
-    inset: 0;
+    right: 0.75rem;
+    bottom: 0.75rem;
     z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(6, 6, 7, 0.55);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    opacity: 0;
-    transition: opacity 0.4s var(--ease-smooth);
-}
-
-.portfolio-item:hover .portfolio-overlay {
-    opacity: 1;
-}
-
-.portfolio-overlay-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.7rem 1.4rem;
-    background: var(--text-primary);
-    color: var(--bg-dark);
-    border-radius: 2px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    transform: translateY(10px);
-    transition: transform 0.4s var(--ease-smooth);
+    gap: 0.45rem;
+    padding: 0.5rem 0.85rem;
+    border: 1px solid var(--card-border-hover);
+    border-radius: 999px;
+    background: rgba(6, 6, 7, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.4s var(--ease-smooth), transform 0.4s var(--ease-smooth);
 }
 
-.portfolio-item:hover .portfolio-overlay-btn {
+.portfolio-item:hover .portfolio-chip,
+.portfolio-item:focus-visible .portfolio-chip {
+    opacity: 1;
     transform: translateY(0);
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .portfolio-overlay,
-    .portfolio-overlay-btn {
-        transition: none;
+/* M4 — the address bar. Present and dim at rest so the frame reads as a real
+   browser; on hover it retypes itself and brightens. */
+.browser-url {
+    flex: 1;
+    min-width: 0;
+    margin-left: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.3s var(--ease-smooth);
+}
+
+.portfolio-item:hover .browser-url {
+    color: var(--text-muted);
+}
+
+.browser-url.typing::after {
+    content: "";
+    display: inline-block;
+    width: 1px;
+    height: 0.9em;
+    margin-left: 1px;
+    background: currentColor;
+    vertical-align: text-bottom;
+    animation: urlCaret 0.7s steps(1) infinite;
+}
+
+@keyframes urlCaret {
+    50% {
+        opacity: 0;
     }
 }
 
-/* Touch devices have no hover — show the button state permanently so the
-   affordance isn't hidden behind an interaction that doesn't exist there. */
-@media (hover: none), (pointer: coarse) {
-    .portfolio-overlay {
+/* C — the project name rolls and the address takes its place, reusing the M9
+   label machinery (.btn-label mask + a ::after reading data-label). */
+.js .portfolio-item:hover .btn-label-in,
+.js .portfolio-item:focus-visible .btn-label-in {
+    transform: translateY(-100%);
+}
+
+.portfolio-name .btn-label-in::after {
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+
+/* The address is longer than the project name, and the mask is sized by the
+   name — "pherobistro.netlify.app" got sliced to "pherobistro." without this.
+   A zero-height, hidden copy of the address widens the mask to fit both.
+   Scoped to real pointers: on touch the roll never runs, so there is no
+   reason to let it widen the caption and squeeze the category beside it. */
+@media (hover: hover) and (pointer: fine) {
+    .portfolio-name .btn-label[data-alt]::after {
+        content: attr(data-alt);
+        display: block;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+        font-family: var(--font-mono);
+        font-size: 0.8em;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+}
+
+/* D — the two columns drift past each other as the section scrolls. Its own
+   element because .portfolio-item carries the .blur-reveal entrance transform
+   and the two would overwrite each other. */
+.portfolio-drift {
+    will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .portfolio-chip {
         opacity: 1;
-        background: rgba(6, 6, 7, 0.32);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
+        transform: none;
+        transition: none;
     }
 
-    .portfolio-overlay-btn {
+    .browser-url.typing::after {
+        animation: none;
+    }
+
+    .js .portfolio-item:hover .btn-label-in,
+    .js .portfolio-item:focus-visible .btn-label-in {
+        transform: none;
+    }
+
+    .portfolio-drift {
+        transform: none !important;
+        will-change: auto;
+    }
+}
+
+/* Touch devices have no hover — show the chip permanently so the affordance
+   isn't hidden behind an interaction that doesn't exist there. */
+@media (hover: none), (pointer: coarse) {
+    .portfolio-chip {
+        opacity: 1;
         transform: none;
     }
 }
