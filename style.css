@@ -1111,7 +1111,8 @@ ul {
     background-color: var(--bg-card);
     border-radius: 12px;
     overflow: hidden;
-    transition: transform 0.4s var(--ease-smooth), border-color 0.4s var(--ease-smooth);
+    transition: transform 0.4s var(--ease-smooth), border-color 0.4s var(--ease-smooth),
+        opacity 0.4s var(--ease-smooth);
 }
 
 .spotlight-card:hover {
@@ -1192,6 +1193,86 @@ ul {
 
 .spotlight-card:hover .icon-wrapper {
     color: var(--accent);
+}
+
+/* ==========================================================================
+   Services cards — on top of the lift, spotlight and accent icon that were
+   already here.
+   ========================================================================== */
+
+/* A — the icon redraws itself. Every shape in those 11 icons carries
+   pathLength="1", so one normalised dasharray covers all 34 of them whatever
+   their real length. A keyframe rather than a transition: a transition on
+   :hover could only run 0 -> 1, which would erase the icon. The animation runs
+   1 -> 0 so it draws, and letting go of the hover leaves the plain, fully
+   drawn icon behind. No .js gate needed — at rest no dasharray is applied at
+   all, so a no-JS visit sees exactly today's icon. */
+@keyframes iconDraw {
+    from {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+    }
+
+    to {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 0;
+    }
+}
+
+@media (hover: hover) and (pointer: fine) {
+
+    .services-index-grid .spotlight-card:hover .icon-wrapper svg > *,
+    .services-index-grid .spotlight-card:focus-visible .icon-wrapper svg > * {
+        animation: iconDraw 0.7s var(--ease-smooth) both;
+    }
+
+    /* Multi-part icons build up instead of appearing at once. `both` holds the
+       from-state during the delay, so a waiting shape is simply not drawn yet. */
+    .services-index-grid .spotlight-card:hover .icon-wrapper svg > *:nth-child(2) {
+        animation-delay: 0.07s;
+    }
+
+    .services-index-grid .spotlight-card:hover .icon-wrapper svg > *:nth-child(3) {
+        animation-delay: 0.14s;
+    }
+
+    .services-index-grid .spotlight-card:hover .icon-wrapper svg > *:nth-child(4) {
+        animation-delay: 0.21s;
+    }
+
+    /* B — the other ten step back so the one under the pointer is the only
+       thing lit. Four lines, and it changes the register of the whole grid. */
+    .services-index-grid:hover .spotlight-card:not(:hover) {
+        opacity: 0.35;
+    }
+}
+
+/* C — the service title rolls to "find out more", reusing the M9 label
+   machinery the buttons and the portfolio already use. */
+.js .spotlight-card:hover .btn-label-in,
+.js .spotlight-card:focus-visible .btn-label-in {
+    transform: translateY(-100%);
+}
+
+.spotlight-card h3 .btn-label-in::after {
+    font-family: var(--font-mono);
+    font-size: 0.72em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .services-index-grid .spotlight-card:hover .icon-wrapper svg > *,
+    .services-index-grid .spotlight-card:focus-visible .icon-wrapper svg > * {
+        animation: none;
+    }
+
+    .js .spotlight-card:hover .btn-label-in,
+    .js .spotlight-card:focus-visible .btn-label-in {
+        transform: none;
+    }
 }
 
 .card-text-wrapper h3 {
@@ -1464,6 +1545,22 @@ ul {
    Scoped to real pointers: on touch the roll never runs, so there is no
    reason to let it widen the caption and squeeze the category beside it. */
 @media (hover: hover) and (pointer: fine) {
+    /* The service titles roll to a different typography than the portfolio
+       names, so they need their own sizer or it measures the wrong string
+       width and clips. */
+    .spotlight-card h3 .btn-label[data-alt]::after {
+        content: attr(data-alt);
+        display: block;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+        font-family: var(--font-mono);
+        font-size: 0.72em;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
     .portfolio-name .btn-label[data-alt]::after {
         content: attr(data-alt);
         display: block;

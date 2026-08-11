@@ -81,6 +81,22 @@ Po revertu M11 si majitel vyžádal, ať horní část zůstane animovaná — *
 - **Pod 480 px a při reduced motion** se nezapisuje vůbec; 481–768 px má kratší posun (−22 px). Bez JS beze změny.
 - Perf: prokládané A/B proti stavu před M11 — **avg 16,7 ms / 0 framů přes 33 ms** na obou stranách. Mimo hero nula zápisů, `will-change` zpátky na `auto`.
 
+### Hotovo (2026-08-11) — Služby: kreslená ikona, ztlumení sourozenců, rolující titulek
+
+Tři efekty na mřížku 11 karet, **všechny bez jediného nového assetu**.
+
+- **Ikona se na hover sama nakreslí.** Ověřeno předem: všech 11 ikon je čistě tahových (`fill="none"`), dohromady 34 tvarů — path, rect, circle, line. Každý tvar dostal `pathLength="1"`, takže jedna normalizovaná `stroke-dasharray` funguje na všechny bez ohledu na skutečnou délku, a **nebylo potřeba žádné JS měření** přes `getTotalLength()`.
+- **Je to `@keyframes`, ne `transition`.** Transition na `:hover` umí jen 0 → 1, což by ikonu mazalo. Animace jede 1 → 0, takže kreslí, a po opuštění hoveru zůstane obyčejná dokreslená ikona. **Nepotřebuje `.js` gate** — v klidovém stavu se žádná dasharray neaplikuje, takže bez JS vypadá ikona přesně jako dosud.
+- Vícedílné ikony mají stagger 70 ms přes `:nth-child`; `animation-fill-mode: both` drží during-delay stav, takže čekající tvar prostě ještě není nakreslený.
+- **Ostatní karty ztlumí na 0.35** (z plánu M5). Čtyři řádky CSS a změní to dojem z celé sekce.
+- **Titulek roluje na „Zjistit více" / „Find out more"** — recyklovaná mechanika M9 přes `rollLabel()`. Nový klíč `svc_more`, ověřen round-trip v obou jazycích (všech 11 karet).
+- **Vlastní šířková rozpěrka.** Služby rolují na jinou typografii než portfolio (mono 0.72em, uppercase, letter-spacing 0.06em), takže sdílet rozpěrku s `.portfolio-name` by měřilo špatnou šířku a titulek by se ořízl. Každý má svou.
+- Reduced motion i dotyk: kreslení ani ztlumení neběží.
+
+**Co se vědomě nedělalo:** náhledy podstránek à la M4. Technicky by šly nasnímat, ale 11 screenshotů je ~1,4 MB (trojnásobek celého portfolia) a hlavně jsou všechny podstránky ze stejné šablony — ty náhledy by vypadaly identicky a jen by divákovi ukázaly, že jsou ty stránky stejné. Stejně tak se nepředělávala sekce na seznam podle M5: ten počítá s očíslovanými řádky `(01)`, `(02)`, a čísla sekcí byla právě zrušená.
+
+Perf: **avg 16,7 ms / 0 framů přes 33 ms**, stejně jako před M11.
+
 ### Hotovo (2026-08-11) — M4 ⭐ + čísla sekcí pryč
 
 **Čísla sekcí `(01)`–`(07)` zrušená** (rozhodnutí majitele) — 95 výskytů ve 23 souborech, plus pravidlo `.section-num`. Odstavec v `AGENTS.md`, který je předepisoval, je přeškrtnutý a označený jako neplatný, jinak je příští session vrátí zpátky.

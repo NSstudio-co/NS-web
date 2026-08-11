@@ -98,6 +98,7 @@ const translations = {
         form_package_msg: "Dobrý den, mám zájem o balíček {name}.",
         form_service_msg: "Dobrý den, mám zájem o službu {name}.",
         form_chip_package: "Vybraný balíček",
+        svc_more: "Zjistit více",
         form_chip_service: "Vybraná služba",
         faq_tail: "Nenašli jste svou odpověď?",
         faq_tail_cta: "Zeptejte se nás",
@@ -236,6 +237,7 @@ const translations = {
         form_package_msg: "Hi, I'm interested in the {name} package.",
         form_service_msg: "Hi, I'm interested in your {name} service.",
         form_chip_package: "Selected package",
+        svc_more: "Find out more",
         form_chip_service: "Selected service",
         faq_tail: "Didn't find your answer?",
         faq_tail_cta: "Ask us",
@@ -1225,6 +1227,14 @@ function wrapButtonLabels() {
     document.querySelectorAll('.portfolio-item[data-url] .portfolio-name').forEach(name => {
         rollLabel(name, name.closest('[data-url]').dataset.url);
     });
+
+    // ...and on the service cards, where it rolls to the prompt instead.
+    const more = (translations[currentLang] || translations.cs).svc_more;
+    if (more) {
+        document.querySelectorAll('.services-index-grid .spotlight-card h3').forEach(h => {
+            rollLabel(h, more);
+        });
+    }
 }
 
 /* ==========================================================================
