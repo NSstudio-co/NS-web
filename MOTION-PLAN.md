@@ -55,9 +55,19 @@ Na webu běží 11 samostatných pohybových systémů:
 
 **Perf po M9 + M10 + M11 + kontaktní stránce**, prokládané A/B proti stavu před M11 (4× CPU throttling, 60× wheel, 3 běhy): **před avg 16.7 ms / 0 framů přes 33 ms — po avg 16.7 ms / 0 framů přes 33 ms.**
 
-### M7 — nejde udělat, jak je zadané
+### Hotovo (2026-08-11) — M6 (místo M7, po rozhodnutí majitele)
 
-Plán počítá se „statickou mřížkou log". Sekce Dovednosti ale žádná loga nemá — je to 6 karet, každá ikona + `<h4>` + odstavec popisu s `data-i18n`. Udělat z nich dva jedoucí pásy znamená ten popisný text buď smazat, nebo ho nechat vodorovně ujíždět, což je nečitelné. Obojí je ztráta obsahu, ne animace. **Potřebuje rozhodnutí:** buď jiný Tier-2 efekt (M6 se teď nabízí — hero už je sticky, takže stackování sekcí na něj navazuje), nebo dodat sekci se skutečnými logy technologií.
+- **Stackují se tři sekce: Služby → Balíčky → Portfolio**, closer je Manifest. Krátký běh záměrně: kdyby se stackovalo všechno, přestane to být efekt. Proces (M2) a jeho sticky scéna zůstávají nedotčené.
+- **Připíchnutí je na ZÁPORNÉM `top`, ne `top: 0`.** Všechny tři sekce jsou vyšší než viewport (Služby 1168 px proti 900 px) — při `top: 0` by se posledních 268 px nedalo nikdy zobrazit, což je ztráta obsahu, ne animace. `top = (viewport − výška)` sekci připíchne až ve chvíli, kdy její spodek dojede na spodek obrazovky, takže se nejdřív celá přečte. CSS to neumí (procento se počítá z containing blocku, ne z elementu), takže to per sekci píše `initSectionStack()` při initu a resize. **Ověřeno: spodek všech tří sekcí je dosažitelný** (877 / 874 / 874 px při viewportu 900).
+- **Ztmavení je opacity překryvu, ne `filter: brightness()`.** Filtr na elementu přes celý viewport ho překresluje každý frame; opacity zůstane na kompozitoru. Překryv je skutečný bezdětný div (`.stack-veil`), takže se píše inline opacity, ne custom property (ta by invalidovala celou sekci).
+- **Sekce, která najíždí přes jinou, musí být neprůhledná**, jinak spodní prosvítá. Padne tím v těch třech sekcích fixní mřížka teček — vizuálně to nevadí, jsou plné obsahu a tečky mají alfu 0.098. Alternativa (dokreslit tečky do sekce a držet je v kroku s globální mřížkou) by stála zápis `background-position` na tři velké elementy každý frame.
+- **Pod 900 px a při reduced motion** se stackování vypíná úplně (`position: static`, průhledné pozadí, překryv `display: none`); JS hlídá stejné dvě podmínky a přestane zapisovat.
+
+**Opraven bug z M11 (nalezen při ověřování M6):** `.hero-glow` se zvětšuje na 1.15, takže z vrstvy široké 1440 px bylo 1656 px a `scrollWidth` dokumentu vyrostl na 1548. `overflow-x: hidden` na `body` to vizuálně ořízl, takže nebylo nic vidět, ale stránka se neměla rozšiřovat. `.hero` dostal `overflow: hidden` — glow vyhasne do průhledna dávno před svým okrajem, takže ořez nic nestojí. Na sticky elementu samotném je to bezpečné; sticky by rozbil až `overflow` na **předkovi**.
+
+### M7 — nejde udělat, jak je zadané (nahrazeno M6)
+
+Plán počítá se „statickou mřížkou log". Sekce Dovednosti ale žádná loga nemá — je to 6 karet, každá ikona + `<h4>` + odstavec popisu s `data-i18n`. Udělat z nich dva jedoucí pásy znamená ten popisný text buď smazat, nebo ho nechat vodorovně ujíždět, což je nečitelné. Obojí je ztráta obsahu, ne animace. Pokud se k M7 vrátíme, chce to **samostatný pás se skutečnými logy technologií** (self-hosted SVG — Devicon CDN je podle `AGENTS.md` pryč) nad nebo pod stávající mřížkou, ne přestavbu karet.
 
 ### Hotovo (2026-08-11) — M11 (nad rámec původního plánu)
 

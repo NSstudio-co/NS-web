@@ -432,6 +432,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initPageTransitions();
     initFloatingContact();
     initGrainVelocity();
+    initSectionStack();
     initScrollProgress();
     initMagneticButtons();
     initRotatingWords();
@@ -1031,6 +1032,87 @@ function initHeroMotion() {
 
     flat.addEventListener('change', sync);
     soft.addEventListener('change', sync);
+    sync();
+}
+
+/* ==========================================================================
+   M6 — sections stack. Each .stack-section pins once it has been read in
+   full, and dims and recedes as the next section slides up over it.
+
+   The pin offset is computed here rather than in CSS: every section in the
+   run is taller than the viewport, and a plain top: 0 would pin them with
+   their last few hundred pixels permanently below the fold. top =
+   (viewport - height) pins a section at the moment its bottom reaches the
+   bottom of the screen instead.
+   ========================================================================== */
+const SECTION_STACK = {
+    dim: 0.45,  // veil opacity once fully covered
+    scale: 0.04 // 1 -> 0.96
+};
+
+function initSectionStack() {
+    const sections = Array.from(document.querySelectorAll('.stack-section'));
+    if (!sections.length) return;
+
+    const flat = window.matchMedia('(max-width: 900px), (prefers-reduced-motion: reduce)');
+
+    // Layout position, walked through offsetParent: getBoundingClientRect()
+    // would report where a pinned section currently sits, not where it lives.
+    const layoutTop = (el) => {
+        let y = 0;
+        for (let n = el; n; n = n.offsetParent) y += n.offsetTop;
+        return y;
+    };
+
+    const items = sections.map(el => {
+        const veil = document.createElement('div');
+        veil.className = 'stack-veil';
+        veil.setAttribute('aria-hidden', 'true');
+        el.appendChild(veil);
+        return { el, veil, next: el.nextElementSibling, nextTop: Infinity, last: -1 };
+    });
+
+    const measure = () => {
+        items.forEach(it => {
+            const overhang = it.el.offsetHeight - window.innerHeight;
+            it.el.style.top = overhang > 0 ? `${-overhang}px` : '0px';
+            it.nextTop = it.next ? layoutTop(it.next) : Infinity;
+        });
+    };
+
+    const clear = () => {
+        items.forEach(it => {
+            it.el.style.top = '';
+            it.el.style.transform = '';
+            it.veil.style.opacity = '';
+            it.last = -1;
+        });
+    };
+
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+
+    onScroll(({ y, vh }) => {
+        if (flat.matches) return;
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            // 0 while the next section is still a full screen away, 1 once its
+            // top has reached the top of the viewport.
+            const gap = (it.nextTop - y) / vh;
+            const cover = 1 - Math.max(0, Math.min(gap, 1));
+            const next = Math.round(cover * 200) / 200; // 0.5% steps
+            if (next === it.last) continue; // this section only, not the rest
+            it.last = next;
+            it.el.style.transform = next > 0 ? `scale(${1 - next * SECTION_STACK.scale})` : '';
+            it.veil.style.opacity = next * SECTION_STACK.dim;
+        }
+    });
+
+    const sync = () => {
+        if (flat.matches) clear();
+        else { measure(); items.forEach(it => { it.last = -1; }); requestScrollFrame(); }
+    };
+    flat.addEventListener('change', sync);
     sync();
 }
 

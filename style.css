@@ -831,6 +831,13 @@ ul {
 .js .hero-track .hero {
     position: sticky;
     top: 0;
+    /* .hero-glow scales to 1.15, which pushed a 1440px layer out to 1656px and
+       grew the document's scrollWidth. body's overflow-x: hidden clipped it so
+       nothing was visible, but the page should not be getting wider. The glow
+       fades to transparent well before its own edges, so clipping here costs
+       nothing. Safe on the sticky element itself — only an ANCESTOR's overflow
+       would break the pinning. */
+    overflow: hidden;
 }
 
 /* The radial glow is the one thing still on screen when the hero unpins, so
@@ -2530,6 +2537,77 @@ ul {
     .footer-links {
         flex-direction: column;
         gap: 2rem;
+    }
+}
+
+/* ==========================================================================
+   M6 — sections stack. Services, pricing and portfolio pin in turn and the
+   next one slides up over the last, which recedes and dims behind it.
+
+   Each pins with a NEGATIVE top, not top: 0, because all three are taller
+   than the viewport (services is 1168px against 900px): pinned at 0, its last
+   268px could never be scrolled to. A top of (viewport - height) pins the
+   section only once its bottom has reached the bottom of the screen, so it is
+   read in full first and only then holds. CSS can't express that — a
+   percentage there resolves against the containing block, not the element —
+   so initSectionStack() writes it per section on load and resize.
+
+   Deliberately a short run of three, ending before the manifest. Stacking
+   everything stops reading as an effect, and the process section already owns
+   a sticky scene of its own (M2) that this must not touch.
+   ========================================================================== */
+.js .stack-section {
+    position: sticky;
+    top: 0; /* replaced per-section by initSectionStack() */
+    z-index: 1;
+    will-change: transform;
+}
+
+/* A section sliding over another has to be opaque or the one behind reads
+   straight through it. .stack-closer is the first section past the run: it
+   does not pin, but it still has to cover the last one that does. */
+.js .stack-section,
+.js .stack-closer {
+    background-color: var(--bg-dark);
+}
+
+.js .stack-closer {
+    position: relative;
+    z-index: 1;
+}
+
+/* The receding section dims behind an overlay's opacity rather than
+   filter: brightness() — a filter on a full-viewport element repaints it
+   every frame, an opacity change stays on the compositor. The veil is a real
+   childless div (added by initSectionStack) so JS writes an inline opacity
+   instead of a custom property, which would invalidate the whole section. */
+.stack-veil {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--bg-dark);
+}
+
+/* Below 900px and under reduced motion there is no stacking at all: pinning
+   three full sections on a phone is just three screens that refuse to leave.
+   JS watches the same two conditions and stops writing. */
+@media (max-width: 900px), (prefers-reduced-motion: reduce) {
+
+    .js .stack-section {
+        position: static;
+        will-change: auto;
+        transform: none;
+    }
+
+    .js .stack-section,
+    .js .stack-closer {
+        background-color: transparent;
+    }
+
+    .stack-veil {
+        display: none;
     }
 }
 
