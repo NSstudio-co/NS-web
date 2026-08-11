@@ -55,7 +55,20 @@ Na webu běží 11 samostatných pohybových systémů:
 
 **Perf po M9 + M10 + M11 + kontaktní stránce**, prokládané A/B proti stavu před M11 (4× CPU throttling, 60× wheel, 3 běhy): **před avg 16.7 ms / 0 framů přes 33 ms — po avg 16.7 ms / 0 framů přes 33 ms.**
 
-### Hotovo (2026-08-11) — hero se hýbe, ale nic se nepřipíchne
+### Hotovo (2026-08-11) — pin je zpátky (finální stav hera)
+
+Majitel si po vyzkoušení verze bez připíchnutí vyžádal **M11 zpátky 1:1**. Obnoveno z gitu včetně původního časování vrstev (nadpis 0–0.50, podnadpis 0.10–0.60, stats 0.55–0.90, tlačítka 0.70–1.00, šipka 0–0.18), pinu 150vh a glow, který dojede na 0.4.
+
+Naměřeno: track 2250 px, scéna 900 px, pin **1350 px = přesně 150vh**, `heroTop` drží na 0 po celé p=0→1, pak se uvolní a Služby nastoupí. Mimo pin nula zápisů, `will-change` zpátky na `auto`, žádné vodorovné přetečení. Perf: **avg 16,7 ms / 0 framů přes 33 ms**, stejně jako před M11.
+
+Zachováno z mezikroku: `.hero { overflow: hidden }` (kvůli škálujícímu glow), `#hero::before { content: none }` + `.hero-glow` jako skutečný element, easing in-out sine.
+
+**Dva známé kompromisy** (obojí bylo v M11 od začátku, majitel je viděl a chtěl 1:1):
+
+1. Po odepnutí je 100vh, kdy se prázdné hero odroluje — geometrické minimum pro 100vh sticky hero. Nese to ztlumený glow. Zkrátit lze přes `--hero-pin` (1 = 100vh).
+2. Mezi p≈0.6 a 0.85 zůstávají na ploše jen tlačítka (drží do 0.70) a doznívající stats bar. Pokud mají odejít s textem, `cta.from` na ~0.45.
+
+#### Mezikrok (2026-08-11) — verze bez připíchnutí, nahrazena výše
 
 Po revertu M11 si majitel vyžádal, ať horní část zůstane animovaná — **ale bez připíchnutí**. To je ten správný závěr z celé té zápletky: vadilo zastavení stránky, ne pohyb.
 

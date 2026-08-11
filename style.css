@@ -85,6 +85,23 @@
     --ease-smooth: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-slow: cubic-bezier(0.16, 1, 0.3, 1);
     --nav-height: 80px;
+
+    /* Pinned hero. --hero-stage is the height of the pinned stage, --hero-pin
+       how many extra stage-heights it stays pinned for: 1.5 means progress
+       0 -> 1 spans 150vh of scrolling. Set it to 1 for a shorter hold.
+       Per-part travel and timing live in HERO_MOTION in script.js. */
+    --hero-stage: 100vh;
+    --hero-pin: 1.5;
+}
+
+/* svh instead of vh so the pinned stage doesn't resize when the mobile URL bar
+   hides — a 100vh stage jumps mid-scroll on iOS. Guarded rather than written
+   as a second declaration: a custom property holding an unknown unit still
+   parses, so the usual two-declaration fallback would not catch it. */
+@supports (height: 1svh) {
+    :root {
+        --hero-stage: 100svh;
+    }
 }
 
 /* ==========================================================================
@@ -775,7 +792,7 @@ ul {
 /* Hero Section */
 .hero {
     position: relative;
-    min-height: 100vh;
+    min-height: var(--hero-stage);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -797,10 +814,24 @@ ul {
 }
 
 /* ==========================================================================
-   Hero motion — the hero is NOT pinned. The page scrolls normally; these are
-   just the parts leaving on their own slices of the hero's own scroll-away,
-   so it lifts with some depth instead of sliding off in one piece.
+   Hero motion — the hero sticks to the top of its track and the track is one
+   stage taller than the pin distance, so the hero unpins on its own and the
+   next section arrives with nothing overlapping. All of it is gated behind
+   .js: with no JavaScript the track has no height of its own and the hero is
+   the plain full-height block it has always been.
    ========================================================================== */
+.hero-track {
+    position: relative;
+}
+
+.js .hero-track {
+    height: calc(var(--hero-stage) * (1 + var(--hero-pin)));
+}
+
+.js .hero-track .hero {
+    position: sticky;
+    top: 0;
+}
 
 /* The glow scales as the hero leaves, which would push a 1440px layer out to
    1656px and grow the document's scrollWidth. body's overflow-x: hidden hid
@@ -2377,6 +2408,19 @@ ul {
         padding-bottom: 3rem;
     }
 
+    /* The hero is content-height on phones, so the track can't be a multiple
+       of the stage — it's the hero plus one screen of padding, and that
+       padding is the whole pin distance. JS measures the real heights either
+       way, so shortening the pin here needs no change in script.js. */
+    :root {
+        --hero-pin: 1;
+    }
+
+    .js .hero-track {
+        height: auto;
+        padding-bottom: calc(var(--hero-stage) * var(--hero-pin));
+    }
+
     .hero-subtitle {
         margin-bottom: 2rem;
     }
@@ -2423,6 +2467,23 @@ ul {
 
     .section-title {
         font-size: 1.6rem;
+    }
+}
+
+/* Small phones and reduced motion: no pin at all. The track loses its extra
+   height, the hero goes back to normal flow, and the entrance animation is the
+   whole story — which is what a 390px screen wants anyway. initHeroMotion
+   watches the same two conditions and stops writing, clearing anything it had
+   already set, so no !important is needed here. Placed after the 768px block
+   so it wins over the shortened pin above. */
+@media (max-width: 480px), (prefers-reduced-motion: reduce) {
+    .js .hero-track {
+        height: auto;
+        padding-bottom: 0;
+    }
+
+    .js .hero-track .hero {
+        position: static;
     }
 }
 

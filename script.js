@@ -951,13 +951,17 @@ function initHeroReveal() {
 }
 
 /* ==========================================================================
-   Hero motion — the hero's parts leave on their own slices of its scroll-away.
-   Nothing is pinned: progress is simply how far the hero has scrolled past,
-   0 at the top of the page and 1 once its full height has gone by. The page
-   never stops, which is the whole point — the pinned version was tried and
-   pulled because holding the page still is what felt wrong.
+   Hero motion — the hero is pinned for a fixed scroll distance and its parts
+   leave on their own slices of that distance, instead of the page simply
+   scrolling past it. Progress is 0 when the hero's top reaches the top of the
+   viewport and 1 when it unpins, after which it scrolls away normally.
 
-   Driven by scroll position, not time, so scrubbing back is exact.
+   Driven by scroll position, not time, so scrubbing back is exact and there is
+   no animation to fall behind the finger. It registers into the M0 scroll loop
+   rather than adding a listener of its own.
+
+   How long it holds is --hero-pin in style.css: 1.5 means 150vh of scrolling,
+   1 is a noticeably shorter hold.
 
    Each moving group is a .hero-layer wrapper. The entrance animation
    (.hero-fade, .word-mask) already owns the transform on the elements
@@ -972,14 +976,16 @@ const HERO_MOTION = {
        page), `fade` how much opacity it gives up. `guard` marks the layers
        holding links: once invisible they leave the tab order too. */
     layers: [
-        { name: 'head', from: 0.00, to: 0.55, shift: -70, fade: 1 },
-        { name: 'sub', from: 0.08, to: 0.62, shift: -55, fade: 1 },
-        { name: 'cta', from: 0.16, to: 0.70, shift: -40, fade: 1, guard: true },
-        { name: 'cue', from: 0.00, to: 0.16, shift: -18, fade: 1, guard: true },
-        { name: 'stats', from: 0.30, to: 0.80, shift: -26, fade: 1 }
+        { name: 'head', from: 0.00, to: 0.50, shift: -60, fade: 1 },
+        { name: 'sub', from: 0.10, to: 0.60, shift: -60, fade: 1 },
+        { name: 'cta', from: 0.70, to: 1.00, shift: -40, fade: 1, guard: true },
+        { name: 'cue', from: 0.00, to: 0.18, shift: -20, fade: 1, guard: true },
+        { name: 'stats', from: 0.55, to: 0.90, shift: -30, fade: 1 }
     ],
-    glow: { scale: 0.12, rise: -6, dim: 0.55 },
-    softShift: -22, // 481-768px: same choreography, shorter travel
+    /* The glow runs the whole range: it is the only thing still on screen when
+       the hero unpins, so it carries the handover to the next section. */
+    glow: { scale: 0.15, rise: -8, dim: 0.6 },
+    softShift: -24, // 481-768px: same choreography, shorter travel
     /* In-out sine, deliberately NOT --ease-slow. Expo-out is a curve for
        motion that plays over time; scrubbed, it spends almost all its travel
        in the first tenth of the input, which reads as a teleport. */
@@ -1014,8 +1020,9 @@ function cubicBezier(x1, y1, x2, y2) {
 }
 
 function initHeroMotion() {
-    const hero = document.querySelector('.hero#hero');
-    if (!hero) return;
+    const track = document.querySelector('.hero-track');
+    const hero = track && track.querySelector('.hero');
+    if (!track || !hero) return;
 
     const layers = HERO_MOTION.layers
         .map(spec => {
@@ -1031,13 +1038,19 @@ function initHeroMotion() {
     const flat = window.matchMedia('(max-width: 480px), (prefers-reduced-motion: reduce)');
     const soft = window.matchMedia('(max-width: 768px)');
 
+    let trackTop = 0;
     let travel = 1;
     let lastP = -1;
     let lifted = false;
 
-    // One read, here and on resize — never in the scroll path. The hero starts
-    // at the top of the page, so its own height is the whole travel.
-    const measure = () => { travel = Math.max(1, hero.offsetHeight); };
+    // Both reads happen here and on resize, never in the scroll path. travel is
+    // the distance the hero stays pinned: the track minus the stage. It's
+    // measured rather than derived from --hero-pin because the hero is
+    // content-height below 768px, where the two don't match.
+    const measure = () => {
+        trackTop = track.getBoundingClientRect().top + window.scrollY;
+        travel = Math.max(1, track.offsetHeight - hero.offsetHeight);
+    };
 
     // will-change only while the hero is actually on its way out; left on, it
     // holds a compositor layer per element for the rest of the page.
@@ -1070,9 +1083,10 @@ function initHeroMotion() {
     onScroll(({ y }) => {
         if (flat.matches) return;
 
-        const p = Math.max(0, Math.min(y / travel, 1));
-        // Below the hero p is pinned at 1. Rewriting the same value still costs
-        // a style recalc on every layer, every frame.
+        const p = Math.max(0, Math.min((y - trackTop) / travel, 1));
+        // Above and below the hero p is pinned at 0 / 1. Rewriting the same
+        // value still costs a style recalc on every layer, every frame — this
+        // guard is what keeps the rest of the page free of the hero.
         if (p === lastP) return;
         lastP = p;
 
