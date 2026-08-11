@@ -113,7 +113,8 @@ Hero je první dojem a dnes je to jen levně nasázený text v prázdném prosto
 
 ### T4 — Číslované sekce + sentence case
 
-- Nad každý `.section-title` přidej eyebrow řádek: `<span class="section-num">(01)</span> <span class="section-label" data-i18n="…">Služby</span>` — mono font, uppercase, `letter-spacing: 0.18em`, `font-size: 0.75rem`; číslo v `--accent`, label v `--text-faint`. Pod eyebrow hairline linka přes celou šířku containeru. Číslování: 01 Služby, 02 Portfolio, 03 Tým, 04 Dovednosti, 05 Proces, 06 FAQ, 07 Kontakt.
+- **Číslování sekcí je od 2026-08-11 zrušené (rozhodnutí majitele) — `.section-num` znovu nepřidávat.** Zbytek odstavce platí bez čísel: eyebrow je jen `<span class="section-label" data-i18n="…">Služby</span>`.
+- ~~Nad každý `.section-title` přidej eyebrow řádek: `<span class="section-num">(01)</span> <span class="section-label" data-i18n="…">Služby</span>`~~ — mono font, uppercase, `letter-spacing: 0.18em`, `font-size: 0.75rem`; ~~číslo v `--accent`,~~ label v `--text-faint`. Pod eyebrow hairline linka přes celou šířku containeru. ~~Číslování: 01 Služby, 02 Portfolio, 03 Tým, 04 Dovednosti, 05 Proces, 06 FAQ, 07 Kontakt.
 - Přepiš CS nadpisy do sentence case + přirozenější znění (uprav klíče v `translations.cs`, EN nech Title Case):
   - `services_title`: „Co přesně děláme"
   - `portfolio_title`: „Naše práce", `portfolio_sub`: „Vybrané projekty, které fungují v praxi"

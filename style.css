@@ -984,10 +984,6 @@ ul {
     letter-spacing: 0.18em;
 }
 
-.section-num {
-    color: var(--accent);
-}
-
 .section-label {
     color: var(--text-faint);
 }
