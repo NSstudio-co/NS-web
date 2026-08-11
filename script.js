@@ -414,6 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         currentLang = document.documentElement.lang === 'en' ? 'en' : 'cs';
     }
+    wrapButtonLabels(); // before anything reads button markup
     initScrollLoop(); // must come first — everything scroll-driven hangs off it
     initSmoothScroll();
     initLineReveals(); // before initBlurReveals — it moves .blur-reveal around
@@ -430,6 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initContactPrefill();
     initPageTransitions();
     initFloatingContact();
+    initGrainVelocity();
     initScrollProgress();
     initMagneticButtons();
     initRotatingWords();
@@ -476,6 +478,10 @@ function updateLanguage(lang) {
 
     // Keep the rotating hero word in the active language
     renderRotateWord();
+
+    // The innerHTML rewrite above wiped the rolled label out of every
+    // translated button — rebuild it, same as the line reveals above.
+    wrapButtonLabels();
 }
 
 /* ==========================================================================
@@ -1029,6 +1035,90 @@ function initHeroMotion() {
 }
 
 /* ==========================================================================
+   M10 — grain reacts to scroll speed. The static grain on body::after stays
+   exactly as it was; this fades a second identical layer in on top of it, so
+   the texture goes from 0.028 at rest to about 0.05 at a fast scroll.
+
+   It has to stay on the edge of perceptible — the moment a visitor notices it
+   consciously it is too strong.
+
+   scrollState.velocity is already lerped by the M0 loop; a raw delta here
+   would make the grain flicker. Nothing else on the site consumed velocity
+   until now, which is why M0 computed it.
+   ========================================================================== */
+const GRAIN = {
+    perPx: 0.00022, // extra opacity per px/frame of scroll
+    max: 0.022      // 0.028 base + this = ~0.05 at speed
+};
+
+function initGrainVelocity() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const layer = document.createElement('div');
+    layer.className = 'grain-boost';
+    layer.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(layer);
+
+    let last = -1;
+    onScroll(({ }) => {
+        const v = Math.min(scrollState.velocity * GRAIN.perPx, GRAIN.max);
+        // 3dp is well past what the eye can see at these values, and it stops
+        // the tail of the lerp writing a new string every frame.
+        const next = Math.round(v * 1000) / 1000;
+        if (next === last) return;
+        last = next;
+        layer.style.opacity = next;
+    });
+}
+
+/* ==========================================================================
+   M9 — button labels. Each label becomes a tight mask around one line of text
+   so it can roll up on hover while a copy rolls in from below (the copy is a
+   ::after reading data-label, so it needs no second element).
+
+   Built here rather than written into the markup: that would mean editing
+   ~150 buttons across 24 files, and updateLanguage() rewrites innerHTML on
+   every [data-i18n] element, which would destroy the structure on every
+   language switch anyway. Re-running after a switch is the same pattern the
+   line reveals already use.
+
+   Idempotent — an already-wrapped button is skipped, so it is safe to call
+   as often as needed.
+   ========================================================================== */
+const BUTTON_LABEL_SELECTOR = '.btn, .pricing-cta, .form-submit';
+
+function wrapButtonLabels() {
+    document.querySelectorAll(BUTTON_LABEL_SELECTOR).forEach(el => {
+        // The words may sit in a child span (next to an icon) or directly in
+        // the button. An icon-only span has no text and must not be picked.
+        let host = Array.from(el.children)
+            .find(c => c.tagName === 'SPAN' && c.textContent.trim());
+        if (!host) host = el;
+
+        if (host.querySelector(':scope > .btn-label')) return; // already wrapped
+
+        // Text nodes only: an <svg> stays exactly where it was in the flow.
+        const nodes = Array.from(host.childNodes)
+            .filter(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+        if (!nodes.length) return;
+
+        const text = nodes.map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+        if (!text) return;
+
+        const mask = document.createElement('span');
+        mask.className = 'btn-label';
+        const inner = document.createElement('span');
+        inner.className = 'btn-label-in';
+        inner.setAttribute('data-label', text);
+        inner.textContent = text;
+        mask.appendChild(inner);
+
+        host.insertBefore(mask, nodes[0]);
+        nodes.forEach(n => n.remove());
+    });
+}
+
+/* ==========================================================================
    Spotlight Hover Effect
    ========================================================================== */
 function initSpotlightEffect() {
@@ -1484,11 +1574,14 @@ function initContactForm() {
         e.preventDefault();
         const formData = new FormData(form);
         const submitBtn = form.querySelector('button[type="submit"]');
-        const originalBtnText = submitBtn.innerText;
+        // innerHTML, not innerText: the button holds an arrow SVG (and, since
+        // M9, a rolled label), and restoring innerText would replace both with
+        // a bare text node — the arrow never came back after a submit.
+        const originalBtnHTML = submitBtn.innerHTML;
 
         // Visual feedback
         submitBtn.disabled = true;
-        submitBtn.innerText = '...';
+        submitBtn.textContent = '...';
 
         try {
             const response = await fetch(form.action, {
@@ -1511,7 +1604,7 @@ function initContactForm() {
             msgEl.classList.add('active'); // Show it
         } finally {
             submitBtn.disabled = false;
-            submitBtn.innerText = originalBtnText;
+            submitBtn.innerHTML = originalBtnHTML;
 
             // Auto hide after 6s
             setTimeout(() => {

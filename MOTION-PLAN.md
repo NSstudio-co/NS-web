@@ -36,6 +36,29 @@ Na webu běží 11 samostatných pohybových systémů:
 - **Cena, měřeno 3× s a 3× bez, 4× CPU throttling:** bez M1 avg 16.8–16.9 ms/frame a 0–2 framy přes 33 ms; s M1 avg 17.2–17.8 ms a 5–13 framů přes 33 ms. Reálně (bez throttlingu) jsou to nejhorší framy kolem 12 ms. Vypnutí = zakomentovat `initSmoothScroll()`.
 - `AGENTS.md` řádek o smooth-scrollu upraven, aby seděl se skutečností. Knihovny (Lenis, GSAP) zůstávají zakázané.
 
+### Hotovo (2026-08-11) — M9 + M10
+
+**M9 — tlačítka.** Label se při hoveru odroluje nahoru a zespoda nastoupí jeho kopie; u `.btn-outline` navíc odspoda vyjede výplň.
+
+- Kopie je `::after` čtoucí `data-label`, ne druhý element. Maska (`.btn-label`) + posouvaná vrstva (`.btn-label-in`) staví `wrapButtonLabels()` v JS — **do markupu to nešlo**: je to ~150 tlačítek ve 24 souborech a `updateLanguage()` navíc přepisuje `innerHTML` každého `[data-i18n]`, takže by strukturu při každém přepnutí jazyka smazal. Po `updateLanguage()` se proto volá znovu (stejný vzorec jako `resplitLineReveals()`). Funkce je idempotentní.
+- **Wipe jen na `.btn-outline`.** `.btn-primary` je už vyplněné, takže výplň najíždějící do výplně nic neudělá. Koncové barvy jsou přesně ty, co `.btn-outline:hover` měl i předtím — mění se jak to dojede, ne kam.
+- **Diakritika:** `.btn-label` má `padding-top: 0.14em` + `margin-top: -0.14em`, jinak `overflow: hidden` ukrojí háčky (stejná oprava jako `.line` v M3).
+- **Opraven starší bug:** `initContactForm()` si po odeslání obnovoval tlačítko přes `innerText`, což smazalo šipkové SVG (a teď i label) — po prvním odeslání se šipka už nikdy nevrátila. Nahrazeno `innerHTML`.
+- Ověřeno: 8/8 tlačítek zabaleno, `label === data-label`, SVG na místě, CZ→EN→CZ round-trip drží, odeslání formuláře vrátí šipku i label.
+
+**M10 — grain reaguje na rychlost scrollu.** 0.028 v klidu → ~0.05 při rychlém scrollu.
+
+- **Nejde přes custom property.** Grain je `body::after`; zapsat proměnnou na `body` znamená invalidovat computed style celého dokumentu každý frame — tedy přesně ta cena, kterou M0 naměřil na `:root` (16.8 → 19.6 ms/frame). Místo toho přibyla druhá, identická vrstva `.grain-boost` jako **vlastní bezdětný div**, kterému JS píše přímo `style.opacity`. Statický grain na `body::after` zůstal beze změny, takže bez JS je vzhled původní.
+- Konzumuje `scrollState.velocity` z M0 — **do teď ji nic nepoužívalo**, M0 ji počítal právě pro M7/M10. Je už lerpovaná, syrová delta by grain rozblikala.
+- Hodnota se zaokrouhluje na 3 desetinná místa, aby ocas lerpu nepsal nový string každý frame.
+- Naměřeno: v klidu 0, při v=129 px/frame 0.022 (tj. celkem 0.05), po zastavení zpátky na 0.
+
+**Perf po M9 + M10 + M11 + kontaktní stránce**, prokládané A/B proti stavu před M11 (4× CPU throttling, 60× wheel, 3 běhy): **před avg 16.7 ms / 0 framů přes 33 ms — po avg 16.7 ms / 0 framů přes 33 ms.**
+
+### M7 — nejde udělat, jak je zadané
+
+Plán počítá se „statickou mřížkou log". Sekce Dovednosti ale žádná loga nemá — je to 6 karet, každá ikona + `<h4>` + odstavec popisu s `data-i18n`. Udělat z nich dva jedoucí pásy znamená ten popisný text buď smazat, nebo ho nechat vodorovně ujíždět, což je nečitelné. Obojí je ztráta obsahu, ne animace. **Potřebuje rozhodnutí:** buď jiný Tier-2 efekt (M6 se teď nabízí — hero už je sticky, takže stackování sekcí na něj navazuje), nebo dodat sekci se skutečnými logy technologií.
+
 ### Hotovo (2026-08-11) — M11 (nad rámec původního plánu)
 
 - **Hero je připíchnutý a jeho části odcházejí po vlastních úsecích scrollu.** `.hero-track` je o jednu scénu vyšší než pin, takže se hero odepne samo a další sekce nastupuje bez překryvu — žádné `z-index` ani neprůhledné pozadí na `.services` nebylo potřeba. Změřeno: track 2250 px, scéna 900 px, pin **1350 px = přesně 150vh**, `heroTop=0` drží po celé p=0→1.

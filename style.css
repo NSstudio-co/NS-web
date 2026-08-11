@@ -169,6 +169,23 @@ body.clean-theme::after {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* M10 — a second grain layer, identical texture, that only fades in with
+   scroll speed. It exists as its own element because the base grain is
+   body::after: driving that would mean writing a custom property onto body,
+   which inherits into every node on the page and costs the same full-document
+   style invalidation per frame that M0 measured on :root (16.8 -> 19.6 ms).
+   An inline opacity on a childless div dirties one element instead.
+   Built by initGrainVelocity(), so a no-JS visit keeps the static grain only. */
+.grain-boost {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 /* Touch / mobile devices: the pointer-following glow has nothing to follow. */
 @media (hover: none), (pointer: coarse) {
     .cursor-glow,
@@ -559,6 +576,102 @@ ul {
 
 .btn-arrow:hover .btn-arrow-icon {
     transform: translateX(4px);
+}
+
+/* ==========================================================================
+   M9 — button motion. The label rolls up and a copy of it rolls in from
+   below; on the hollow variant a fill also wipes up from the bottom edge.
+   The wrapper is built by wrapButtonLabels() (see script.js for why it isn't
+   in the markup) and everything here is gated behind .js, so a no-JS visit
+   keeps today's plain buttons.
+   ========================================================================== */
+.btn-label {
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: top;
+    /* Czech carons sit above the cap height and the overflow slices them off
+       otherwise — same fix the M3 line reveals needed. */
+    padding-top: 0.14em;
+    margin-top: -0.14em;
+}
+
+.btn-label-in {
+    display: block;
+    position: relative;
+}
+
+.js .btn-label-in {
+    transition: transform 0.42s var(--ease-smooth);
+}
+
+.js .btn-label-in::after {
+    content: attr(data-label);
+    position: absolute;
+    left: 0;
+    top: 100%;
+    width: 100%;
+    white-space: nowrap;
+}
+
+.js .btn:hover .btn-label-in,
+.js .btn:focus-visible .btn-label-in,
+.js .pricing-card:hover .btn-label-in,
+.js .pricing-card:focus-visible .btn-label-in {
+    transform: translateY(-100%);
+}
+
+/* Fill wipe. Only the hollow variant gets it: .btn-primary is already filled,
+   so a fill rising into it would read as nothing. The end state is exactly
+   the colours .btn-outline:hover already used — this changes how it arrives,
+   not where it lands. */
+.js .btn-outline {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.js .btn-outline::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    background: var(--text-primary);
+    transform: scaleY(0);
+    transform-origin: bottom;
+    transition: transform 0.45s var(--ease-slow);
+}
+
+.js .btn-outline:hover::before,
+.js .btn-outline:focus-visible::before {
+    transform: scaleY(1);
+}
+
+/* The fill now comes from ::before, so the button's own background must stop
+   swapping or it would jump to the end state instantly underneath. */
+.js .btn-outline:hover,
+.js .btn-outline:focus-visible {
+    background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .js .btn-label-in,
+    .js .btn-outline::before {
+        transition: none;
+    }
+
+    .js .btn:hover .btn-label-in,
+    .js .btn:focus-visible .btn-label-in,
+    .js .pricing-card:hover .btn-label-in,
+    .js .pricing-card:focus-visible .btn-label-in {
+        transform: none;
+    }
+
+    /* Still invert on hover, just without the travel. */
+    .js .btn-outline:hover::before,
+    .js .btn-outline:focus-visible::before {
+        transform: scaleY(1);
+    }
 }
 
 /* Ghost button — subtle text-only CTA (no border) */
