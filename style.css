@@ -1246,8 +1246,16 @@ ul {
     }
 
     /* B — the other ten step back so the one under the pointer is the only
-       thing lit. Four lines, and it changes the register of the whole grid. */
-    .services-index-grid:hover .spotlight-card:not(:hover) {
+       thing lit.
+
+       Keyed on :has(), not on the grid's own :hover. The grid is hovered the
+       moment the pointer crosses a gap between cards, and there no card is
+       :hover — so every one of the eleven dimmed at once and the section just
+       went dark for no reason. :has() only matches while a real card is under
+       the pointer. If a browser doesn't support it the selector is dropped
+       whole and nothing dims, which is the right way to fail. */
+    .services-index-grid:has(.spotlight-card:hover) .spotlight-card:not(:hover),
+    .services-index-grid:has(.spotlight-card:focus-visible) .spotlight-card:not(:focus-visible):not(:hover) {
         opacity: 0.35;
     }
 }

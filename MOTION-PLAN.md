@@ -95,6 +95,10 @@ Přání majitele: zmenšit karty na dlaždice a popis ukázat až po najetí. S
 
 Perf: **avg 16,7 ms / 0 framů přes 33 ms**.
 
+**Oprava (2026-08-12): ztmavení viselo na `:hover` celé mřížky.** Jakmile kurzor vjel do mezery mezi kartami, žádná karta nebyla `:hover` — a ztmavlo jich všech 11 naráz, takže sekce jen tak zhasla. Přepsáno na `:has(.spotlight-card:hover)`, které sedne jen když je pod kurzorem skutečná karta. Když prohlížeč `:has()` neumí, selektor se zahodí celý a netmavne nic — což je správný způsob, jak selhat. Ověřeno ve všech čtyřech stavech: mimo mřížku 0 ztmavených, v mezeře mezi sloupci 0, v mezeře mezi řádky 0, na kartě přesně 10 + 1 plná.
+
+**K ceně hoveru:** stres test (přejezd přes všech 11 karet každých 45 ms, 4×, 4× CPU throttling) dá avg 21,8 ms a 31 framů přes 33. **Není to ale regrese** — stejný test na předchozím commitu (3 sloupce, bez rozbalování, ztmavení přes `:hover`) dal avg 24,4 ms a 37 framů přes 33, tedy hůř. Cenu nese překreslování `stroke-dashoffset` u kreslených ikon, ne rozbalování ani `:has()`. Normální scroll je pořád avg 16,7 ms / 0 framů přes 33.
+
 ### Hotovo (2026-08-11) — Služby: kreslená ikona a ztlumení sourozenců
 
 Tři efekty na mřížku 11 karet, **všechny bez jediného nového assetu**.
